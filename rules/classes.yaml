@@ -1,0 +1,25 @@
+# Render classes: what a metatile *is* for the 2.5D view.
+#
+#   geometry  how the baker builds it
+#     flat      lies on the ground plane at the cell's height
+#     raised    flat surface lifted up (roof tops)
+#     standing  vertical face standing up from the cell's bottom edge
+#     billboard upright quad, may be cut out per object (props, trees)
+#     none      not drawn
+#   colour    debug overlay colour (hex)
+
+classes:
+  ground:      { geometry: flat,      colour: "#8bc34a", description: "Walkable ground: grass, paths, floors" }
+  ground_decor: { geometry: flat,     colour: "#cddc39", description: "Walkable decoration painted on the ground (flowers)" }
+  tall_grass:  { geometry: flat,      colour: "#2e7d32", description: "Wild encounter grass" }
+  water:       { geometry: flat,      colour: "#2196f3", description: "Surfable or decorative water" }
+  ledge:       { geometry: standing,  colour: "#a1887f", description: "One-way jump-down ledge" }
+  wall:        { geometry: standing,  colour: "#ff9800", description: "Vertical front face: building walls, cliff faces" }
+  door:        { geometry: standing,  colour: "#f44336", description: "Warp door set into a wall" }
+  roof:        { geometry: raised,    colour: "#e91e63", description: "Top surface of a building" }
+  tree:        { geometry: billboard, colour: "#1b5e20", description: "Trees and bushes" }
+  prop:        { geometry: billboard, colour: "#9c27b0", description: "Small blocking objects: fences, mailboxes, rocks" }
+  sign:        { geometry: billboard, colour: "#00bcd4", description: "Readable sign" }
+  furniture:   { geometry: standing,  colour: "#795548", description: "Interior interactables: counters, shelves, PCs" }
+  void:        { geometry: none,      colour: "#000000", description: "Black filler outside interiors" }
+  unused:      { geometry: none,      colour: "#9e9e9e", description: "Never placed on any map" }

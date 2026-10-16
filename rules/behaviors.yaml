@@ -1,0 +1,45 @@
+# Metatile behavior -> render class. Behavior names come from the decomp's
+# include/constants/metatile_behaviors.h. A behavior is a strong signal, so it
+# wins over the shape heuristics (but not over per-tileset overrides).
+#
+# Keys may be exact names or globs with *.
+
+behaviors:
+  MB_TALL_GRASS: tall_grass
+  MB_CYCLING_ROAD_PULL_DOWN_GRASS: tall_grass
+
+  MB_POND_WATER: water
+  MB_FAST_WATER: water
+  MB_DEEP_WATER: water
+  MB_WATERFALL: water
+  MB_OCEAN_WATER: water
+  MB_SHALLOW_WATER: water
+  MB_PUDDLE: water
+  MB_HOT_SPRINGS: water
+  MB_*_CURRENT: water
+  MB_CYCLING_ROAD_WATER: water
+
+  MB_JUMP_EAST: { class: ledge, direction: east }
+  MB_JUMP_WEST: { class: ledge, direction: west }
+  MB_JUMP_NORTH: { class: ledge, direction: north }
+  MB_JUMP_SOUTH: { class: ledge, direction: south }
+
+  MB_WARP_DOOR: door
+  MB_CAVE_DOOR: door
+
+  MB_SIGNPOST: sign
+  MB_POKEMON_CENTER_SIGN: sign
+  MB_POKEMART_SIGN: sign
+  MB_INDIGO_PLATEAU_SIGN_*: sign
+
+  MB_COUNTER: furniture
+  MB_BOOKSHELF: furniture
+  MB_POKEMART_SHELF: furniture
+  MB_PC: furniture
+  MB_TELEVISION: furniture
+  MB_CABINET: furniture
+  MB_KITCHEN: furniture
+  MB_DRESSER: furniture
+  MB_COMPUTER: furniture
+  MB_TRASH_BIN: furniture
+  MB_VIDEO_GAME: furniture

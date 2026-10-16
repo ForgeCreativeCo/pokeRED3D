@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metatile Classes</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --panel: #ffffff; --line: #ddddd8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --fg: #ececea; --muted: #9a9a94; --panel: #22221f; --line: #34342f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; }
+  label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+  .legend span.off { opacity: .35; }
+  .legend i { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+  main { padding: 16px; display: grid; gap: 24px; }
+  section h2 { font-size: 14px; margin: 0 0 8px; }
+  .wrap { position: relative; display: inline-block; max-width: 100%; overflow: auto; }
+  .wrap img, .wrap canvas { display: block; image-rendering: pixelated; }
+  .wrap canvas { position: absolute; inset: 0; }
+  #tip { position: fixed; pointer-events: none; z-index: 3; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: 12px/1.4 ui-monospace, monospace; white-space: pre; display: none; box-shadow: 0 4px 16px #0003; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Metatile classes</h1>
+  <label>Zoom <input id="zoom" type="range" min="1" max="5" value="3"></label>
+  <label>Overlay <input id="alpha" type="range" min="0" max="100" value="45"></label>
+  <label><input id="showTop" type="checkbox" checked> overhang markers</label>
+  <label><input id="showGrid" type="checkbox"> collision / elevation</label>
+  <div class="legend" id="legend"></div>
+</header>
+<main id="main"></main>
+<div id="tip"></div>
+<script>
+/*DATA*/
+const hidden = new Set();
+const $ = (id) => document.getElementById(id);
+
+for (const [name, c] of Object.entries(CLASSES)) {
+  const s = document.createElement('span');
+  s.innerHTML = `<i style="background:${c.colour}"></i>${name}`;
+  s.title = c.description;
+  s.onclick = () => { hidden.has(name) ? hidden.delete(name) : hidden.add(name); s.classList.toggle('off'); drawAll(); };
+  $('legend').append(s);
+}
+
+const sections = VIEWS.map((v) => {
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h2>${v.title}</h2><div class="wrap"><img><canvas></canvas></div>`;
+  const img = sec.querySelector('img'), cv = sec.querySelector('canvas');
+  img.src = v.image;
+  $('main').append(sec);
+  const s = { v, img, cv };
+  img.onload = () => draw(s);
+  cv.onmousemove = (ev) => tip(ev, s);
+  cv.onmouseleave = () => ($('tip').style.display = 'none');
+  return s;
+});
+
+function draw({ v, img, cv }) {
+  const z = +$('zoom').value * 16, a = +$('alpha').value / 100;
+  const w = v.width, h = Math.ceil(v.cells.length / w);
+  img.style.width = w * z + 'px';
+  cv.width = w * z; cv.height = h * z;
+  const g = cv.getContext('2d');
+  v.cells.forEach((c, i) => {
+    const e = LOOKUP[c.key], x = (i % w) * z, y = Math.floor(i / w) * z;
+    if (!e || hidden.has(e.class)) return;
+    g.globalAlpha = a;
+    g.fillStyle = CLASSES[e.class].colour;
+    g.fillRect(x, y, z, z);
+    g.globalAlpha = 1;
+    if ($('showTop').checked && e.top && !hidden.has(e.top)) {
+      g.fillStyle = CLASSES[e.top].colour;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + z * .45, y); g.lineTo(x, y + z * .45); g.fill();
+      g.strokeStyle = '#fff'; g.stroke();
+    }
+    if (e.source === 'override') { g.strokeStyle = '#fff'; g.setLineDash([3, 3]); g.strokeRect(x + 1.5, y + 1.5, z - 3, z - 3); g.setLineDash([]); }
+    if ($('showGrid').checked && c.elevation !== undefined) {
+      g.font = `bold ${Math.max(9, z / 4)}px ui-monospace, monospace`;
+      g.fillStyle = c.collision ? '#000' : '#fff';
+      g.fillText((c.collision ? '#' : '') + c.elevation, x + 3, y + z - 4);
+    }
+  });
+}
+const drawAll = () => sections.forEach(draw);
+['zoom', 'alpha', 'showTop', 'showGrid'].forEach((id) => $(id).addEventListener('input', drawAll));
+
+function tip(ev, { v, cv }) {
+  const z = +$('zoom').value * 16, r = cv.getBoundingClientRect();
+  const cx = Math.floor((ev.clientX - r.left) / z), cy = Math.floor((ev.clientY - r.top) / z);
+  const c = v.cells[cy * v.width + cx], t = $('tip');
+  if (!c) return (t.style.display = 'none');
+  const e = LOOKUP[c.key] ?? {};
+  const st = e.stats ?? {};
+  t.textContent = [
+    `metatile ${e.hex}  (${c.key.split(':')[0]})` + (c.elevation !== undefined ? `   cell ${cx},${cy}  elev ${c.elevation}${c.collision ? '  blocked' : ''}` : ''),
+    `class    ${e.class}${e.top ? '   top: ' + e.top : ''}${e.direction ? '   dir: ' + e.direction : ''}   [${e.source}]`,
+    `behavior ${e.behavior}   layer ${e.layerType}`,
+    `placed   ${st.placements}x   walkable ${st.walkable == null ? '-' : Math.round(st.walkable * 100) + '%'}   depth ${st.wallDepth ?? '-'}   column ${st.column ?? '-'}` + (st.green != null ? `   green ${st.green}` : ''),
+    `why      ${(e.reasons ?? []).join('; ')}`,
+  ].join('\n');
+  t.style.display = 'block';
+  t.style.left = Math.min(ev.clientX + 14, innerWidth - t.offsetWidth - 8) + 'px';
+  t.style.top = Math.min(ev.clientY + 14, innerHeight - t.offsetHeight - 8) + 'px';
+}
+</script>
+</body>
+</html>

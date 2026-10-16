@@ -1,0 +1,8 @@
+# Per-metatile overrides for this tileset. Ids are global metatile ids
+# (secondary tilesets start at 0x280). See rules/README.md.
+#
+#   0x289: roof                               # set the class
+#   0x281-0x283: { top: roof }                # inclusive range, set only `top`
+#   0x2a5: { class: ground, top: null, note: "why" }   # remove an overhang
+
+metatiles: {}

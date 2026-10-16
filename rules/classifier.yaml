@@ -1,0 +1,20 @@
+# Tuning knobs for the automatic metatile classifier. See rules/README.md.
+
+# A metatile counts as walkable when at least this fraction of its placements
+# (across every layout using its tileset) have no collision.
+walkable_ratio: 0.5
+
+# Second-layer pixels (of 256) needed before a walkable metatile is treated as
+# having something drawn over the player (a roof edge or tree top).
+overhang_min_pixels: 24
+
+# Blocked metatiles this many rows or fewer above walkable ground are wall
+# faces; anything higher up in the same blocked column is roof.
+wall_max_rows: 2
+
+# Blocked metatiles whose blocked column is only one cell tall are props
+# (fences, mailboxes) rather than buildings.
+prop_max_column: 1
+
+# Blocked metatiles whose visible pixels are mostly green are trees.
+tree_min_green: 0.55

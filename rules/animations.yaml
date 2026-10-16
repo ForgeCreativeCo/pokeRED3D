@@ -1,0 +1,11 @@
+# Animated tiles. The tile ranges themselves are read from the decomp's
+# src/tileset_anims.c; every metatile that uses an animated tile records it
+# under `animated` in the baked output, so the renderer knows to animate it.
+#
+# An entry here also nudges the class of metatiles using that animation:
+#   class  the class to use instead
+#   when   only replace this auto-detected class (overrides still win)
+
+animations:
+  General_Flower: { class: ground_decor, when: ground }
+  CeladonGym_Flowers: { class: ground_decor, when: ground }

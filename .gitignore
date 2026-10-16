@@ -1,0 +1,7 @@
+# Nintendo-derived material never goes in git
+*.gba
+*.zip
+vendor/
+build/
+
+node_modules/
