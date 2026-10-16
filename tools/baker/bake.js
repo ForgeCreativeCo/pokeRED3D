@@ -14,6 +14,7 @@ import { loadRules } from './lib/rules.js';
 import { classifyTilesets } from './lib/classify.js';
 import { bakeMap } from './lib/bake.js';
 import { bakeSong } from './lib/music.js';
+import { bakeScripts } from './lib/scripts.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const OUT = path.join(ROOT, 'build');
@@ -102,9 +103,15 @@ for (const m of new Set(world.map((w) => w.data.music))) {
 }
 console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.samples).length} samples)`);
 
+// Scripts and text for every person and sign in the bake.
+const roots = world.flatMap((w) => [...w.data.objects.map((o) => o.script), ...w.data.signs.map((s) => s.script)]);
+const scripts = { ...bakeScripts(roots), startFlags: [...newGame().hiddenFlags] };
+console.log(`Scripts: ${Object.keys(scripts.scripts).length} scripts, ${Object.keys(scripts.text).length} texts`);
+
 // The preview inlines everything so it opens straight from disk.
 const html = fs.readFileSync(path.join(import.meta.dirname, 'debug/view3d.html'), 'utf8')
-  .replace('/*DATA*/', `const WORLD = ${JSON.stringify(world)};\nconst START = ${JSON.stringify(start)};\nconst MUSIC = ${JSON.stringify(music)};`);
+  .replace('/*DATA*/', `const WORLD = ${JSON.stringify(world)};\nconst START = ${JSON.stringify(start)};\nconst MUSIC = ${JSON.stringify(music)};
+const SCRIPTS = ${JSON.stringify(scripts)};`);
 fs.mkdirSync(path.join(OUT, 'debug'), { recursive: true });
 fs.writeFileSync(path.join(OUT, 'debug/view3d.html'), html);
 console.log(`\nPreview: build/debug/view3d.html`);

@@ -119,6 +119,7 @@ generated from the same data.
 | Animation tagging | **done** | Ranges read from `src/tileset_anims.c` |
 | Height | **done** | Cliffs on routes will need real elevation changes to test |
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
+| Talking and signs | **done** | Decomp scripts and text; common commands; battles and menus skipped |
 | Music | **done** | Map songs from the decomp's MIDI, voicegroups and samples |
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
 | Map connections | **done** | Maps placed by their connection offsets; walk across edges |
@@ -147,6 +148,22 @@ square waves at the GB duty cycles, the wave channel and noise, with the
 engine's envelopes, volume, pan, pitch bend and vibrato. Music starts on the
 first key press or tap (browsers require one) and fades between songs when
 the map's music changes.
+
+## Talking and signs
+
+Press A (Z, Enter or Space, or the on-screen A button) to talk to the person
+you're facing, across a counter too, or to read a sign. The scripts and text
+are the decomp's own, baked by `tools/baker/lib/scripts.js` from everything
+the maps' people and signs can reach. The preview's script player runs the
+common commands: messages (NPC, sign, yes/no), text colour by sprite, flags
+and variables starting from a new save, `goto`/`call`/`switch` and their
+conditions, simple movements and `!` emotes, items given or found. Commands
+for things that don't exist yet (battles, the bag, fanfares, menus) are
+skipped, so those scenes play their lines and stop. `{PLAYER}` and `{RIVAL}`
+are RED and BLUE.
+
+Not yet: step triggers (Oak stopping you at the edge of town), trainer
+battles, the start menu.
 
 ### Known gaps
 

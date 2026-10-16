@@ -26,6 +26,7 @@
     --sky: #1d2a33; --panel: #20231d; --panel-edge: #3a4034; --ink: #ecefe4; --muted: #a2ab96;
     --accent: #f0645a; --accent-ink: #1a0d0c; --pad: #2a2e26cc; --gba-bg: #0b0c0a; color-scheme: dark;
   }
+  [hidden] { display: none !important; }
   html, body { height: 100%; overflow: hidden; }
   body { background: var(--sky); color: var(--ink); font: 14px/1.4 var(--font-ui); }
   #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
@@ -118,6 +119,48 @@
   }
   #musicBtn[aria-pressed="false"] { color: var(--muted); }
   #compareBtn[aria-pressed="true"] { background: var(--panel); color: var(--ink); border: 1px solid var(--panel-edge); }
+  /* The FireRed text box: a white two-line box; signs get a wooden frame. Its
+     colours are the game's own, the same in light and dark themes. */
+  #textbox {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: min(720px, calc(100vw - 32px)); box-sizing: border-box;
+    padding: 12px 22px 14px; background: #f8f8f8; border-radius: 10px;
+    border: 5px double #5d8ea6; box-shadow: 0 6px 24px #0005;
+    font: 500 clamp(17px, 3.2vw, 25px)/1.55 var(--font-display); letter-spacing: .02em;
+  }
+  #textbox[data-style="sign"] { border-color: #9a6b3c; background: #fbf6ea; }
+  #textbox p { margin: 0; min-height: 1.55em; white-space: pre; overflow: hidden; }
+  #textbox[data-color="neutral"] p { color: #404040; text-shadow: 2px 2px 0 #d0d0c8; }
+  #textbox[data-color="male"] p { color: #2f58c8; text-shadow: 2px 2px 0 #a8c0f0; }
+  #textbox[data-color="female"] p { color: #d83838; text-shadow: 2px 2px 0 #f8b8b0; }
+  #tbMore { position: absolute; right: 16px; bottom: 8px; color: #d83838; font-size: 16px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #tbMore { animation: none; } }
+  #yesno {
+    position: fixed; z-index: 3; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+    display: grid; gap: 4px; padding: 10px 18px; background: #f8f8f8; border: 5px double #5d8ea6; border-radius: 10px;
+    font: 500 22px var(--font-display); color: #404040;
+  }
+  #yesno span::before { content: "▶ "; visibility: hidden; color: #404040; }
+  #yesno span.on::before { visibility: visible; }
+  #emote {
+    position: fixed; z-index: 2; transform: translate(-50%, -100%); padding: 2px 9px;
+    background: #ffffff; color: #202020; border: 2px solid #202020; border-radius: 10px;
+    font: 700 22px var(--font-display); pointer-events: none;
+  }
+  #aBtn {
+    position: fixed; z-index: 2; width: 64px; height: 64px; border-radius: 50%;
+    right: calc(16px + 164px + 18px + env(safe-area-inset-right, 0px)); bottom: calc(16px + 58px + env(safe-area-inset-bottom, 0px));
+    border: 1px solid var(--panel-edge); background: var(--accent); color: var(--accent-ink);
+    font: 700 22px var(--font-display); cursor: pointer; touch-action: none;
+  }
+  #aBtn.held { filter: brightness(.85); }
+  /* Unless the window is wide, the text box sits above the d-pad and A button. */
+  @media (max-width: 1180px) {
+    #textbox { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }
+    #yesno { bottom: calc(330px + env(safe-area-inset-bottom, 0px)); }
+  }
   /* Black fade when going through a door or up the stairs. */
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 1; }
   #fade.on { opacity: 1; }
@@ -165,6 +208,11 @@
 </details>
 
 <div id="fade" aria-hidden="true"></div>
+
+<div id="textbox" hidden data-style="normal" data-color="neutral" role="status" aria-live="polite"><p id="tb1"></p><p id="tb2"></p><span id="tbMore" hidden aria-hidden="true">▼</span></div>
+<div id="yesno" hidden><span id="yes">YES</span><span id="no">NO</span></div>
+<div id="emote" hidden aria-hidden="true"></div>
+<button type="button" id="aBtn" aria-label="A: talk, read, continue">A</button>
 
 <div id="dpad" aria-label="Walk">
   <button type="button" data-dir="up" aria-label="Walk north">▲</button>
@@ -274,9 +322,9 @@ const walkFrames = { down: [3, 4], up: [5, 6], left: [7, 8], right: [7, 8] };
 const JUMP_HEIGHT = 0.6; // tiles at the top of a ledge hop
 const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 
-function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0] }, m) {
+function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0], id = null, script = null }, m) {
   const s = m.D.sprites[gfx];
-  const a = { gfx, s, m, area: m.area, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
+  const a = { gfx, s, m, area: m.area, id, script, startFacing: facing, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
   a.root = new THREE.Group();
   a.tilt = new THREE.Group();
   a.root.add(a.tilt);
@@ -321,7 +369,7 @@ const npcs = maps.flatMap((m) => m.D.objects.filter((o) => !o.hidden).map((o) =>
 const actors = [player, ...npcs];
 const areaActors = () => actors.filter((a) => a === player || a.area === area);
 
-const occupied = (x, y, self) => areaActors().some((a) => a !== self && ((a.x === x && a.y === y) || (a.from && a.from.x === x && a.from.y === y)));
+const occupied = (x, y, self) => areaActors().some((a) => a !== self && !a.removed && ((a.x === x && a.y === y) || (a.from && a.from.x === x && a.from.y === y)));
 const canEnter = (x, y, self) => walkable(x, y) && !occupied(x, y, self);
 // ---- warps ----
 // Like FireRed: walking into a door, pressing the arrow's direction on an exit
@@ -664,6 +712,274 @@ $('musicBtn').onclick = () => {
   $('musicBtn').setAttribute('aria-pressed', String(!music.muted));
 };
 
+// ---- talking and signs: a FireRed text box and a small event-script player ----
+// Scripts are the decomp's own (baked into SCRIPTS). The common commands run;
+// ones the preview can't do yet (battles, items, fanfares) are skipped.
+const NAMES = { PLAYER: 'RED', RIVAL: 'BLUE' };
+const TEXT_COLORS = ['male', 'female', 'neutral', 'neutral']; // NPC_TEXT_COLOR_MALE/FEMALE/MON/NEUTRAL
+const story = {
+  flags: new Set(SCRIPTS.startFlags),
+  vars: {},
+};
+let scriptRunning = false;
+const frameWaiters = [];
+/** Resolves once cond() is true, checked every game frame. */
+const until = (cond) => new Promise((resolve) => frameWaiters.push({ cond, resolve }));
+function runWaiters() {
+  for (let i = frameWaiters.length - 1; i >= 0; i--) if (frameWaiters[i].cond()) frameWaiters.splice(i, 1)[0].resolve();
+}
+
+// -- buttons: A talks and advances text, B advances too (as in FireRed) --
+const buttons = { a: false, b: false, aPressed: false, bPressed: false };
+const aKeys = new Set(['z', 'enter', ' ', 'e']), bKeys = new Set(['x', 'backspace', 'escape', 'q']);
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (e.target.closest?.('input, button')) return;
+  if (aKeys.has(k)) { if (!buttons.a) buttons.aPressed = true; buttons.a = true; e.preventDefault(); }
+  if (bKeys.has(k)) { if (!buttons.b) buttons.bPressed = true; buttons.b = true; }
+});
+addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (aKeys.has(k)) buttons.a = false;
+  if (bKeys.has(k)) buttons.b = false;
+});
+const aBtn = $('aBtn');
+aBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); buttons.aPressed = true; buttons.a = true; aBtn.classList.add('held'); });
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) aBtn.addEventListener(ev, () => { buttons.a = false; aBtn.classList.remove('held'); });
+/** True once per press. */
+const takeA = () => { const p = buttons.aPressed || buttons.bPressed; buttons.aPressed = buttons.bPressed = false; return p; };
+
+// -- the text box: two lines, typed out, scrolling and paging like FireRed --
+const box = { lines: [], shown: 0, typing: false, speed: 40, open: false };
+function formatText(t) {
+  return t.replace(/\{(\w+)\}/g, (_, k) => NAMES[k] ?? '');
+}
+function openBox(style, color) {
+  $('textbox').hidden = false;
+  $('textbox').dataset.style = style;
+  $('textbox').dataset.color = color;
+  box.open = true;
+}
+function closeBox() {
+  $('textbox').hidden = true;
+  $('tb1').textContent = $('tb2').textContent = '';
+  box.open = false;
+}
+/** Type out one string; resolves after the reader dismisses its last line. */
+async function say(raw, { style = 'normal', color = 'neutral', wait = true } = {}) {
+  openBox(style, color);
+  const pages = formatText(raw).split('\\p');
+  for (let pi = 0; pi < pages.length; pi++) {
+    const lines = pages[pi].split(/\\[nl]/);
+    $('tb1').textContent = $('tb2').textContent = '';
+    for (let li = 0; li < lines.length; li++) {
+      let el = li === 0 ? $('tb1') : $('tb2');
+      if (li >= 2) {
+        // Scroll: wait, move line 2 up, type the next line below it.
+        $('tbMore').hidden = false;
+        await until(takeA);
+        $('tbMore').hidden = true;
+        $('tb1').textContent = $('tb2').textContent;
+        $('tb2').textContent = '';
+        el = $('tb2');
+      }
+      const line = lines[li];
+      let shown = 0;
+      takeA();
+      await until(() => {
+        const fast = buttons.a || buttons.b;
+        shown = Math.min(line.length, shown + (fast ? 3 : 1) * box.speed * frameDt);
+        el.textContent = line.slice(0, Math.floor(shown));
+        if (takeA()) shown = line.length; // a press finishes the line
+        el.textContent = line.slice(0, Math.floor(shown));
+        return shown >= line.length;
+      });
+    }
+    if (wait || pi < pages.length - 1) {
+      $('tbMore').hidden = false;
+      await until(takeA);
+      $('tbMore').hidden = true;
+    }
+  }
+}
+/** YES / NO in the corner; resolves 1 or 0. */
+async function yesNo() {
+  let choice = 1;
+  const render = () => { $('yes').classList.toggle('on', choice === 1); $('no').classList.toggle('on', choice === 0); };
+  $('yesno').hidden = false; render();
+  takeA();
+  await until(() => {
+    if (held.has('up')) choice = 1;
+    if (held.has('down')) choice = 0;
+    render();
+    if (buttons.bPressed) { buttons.bPressed = false; choice = 0; return true; }
+    if (buttons.aPressed) { buttons.aPressed = false; return true; }
+    return false;
+  });
+  $('yesno').hidden = true;
+  return choice;
+}
+
+// -- the script player --
+const DIR_OF = { 1: 'down', 2: 'up', 3: 'left', 4: 'right' };
+const DIR_NUM = { down: 1, up: 2, left: 3, right: 4 };
+const opposite = { up: 'down', down: 'up', left: 'right', right: 'left' };
+const resolve = (a) => { let v = a; for (let i = 0; i < 4 && SCRIPTS.consts[v] != null; i++) v = SCRIPTS.consts[v]; return v; };
+function value(a) {
+  const v = resolve(a);
+  if (/^VAR_/.test(v)) return v === 'VAR_FACING' ? DIR_NUM[player.facing] : story.vars[v] ?? 0;
+  const n = Number(v);
+  return Number.isNaN(n) ? 0 : n;
+}
+const compare = { eq: (a, b) => a === b, ne: (a, b) => a !== b, lt: (a, b) => a < b, gt: (a, b) => a > b, le: (a, b) => a <= b, ge: (a, b) => a >= b };
+function actorFor(localId, ctx) {
+  if (localId === 'LOCALID_PLAYER' || localId === 'OBJ_EVENT_ID_PLAYER') return player;
+  return areaActors().find((a) => a.id === localId) ?? (localId === 'VAR_LAST_TALKED' ? ctx.target : null);
+}
+const faceToward = (a, b) => {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  a.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
+};
+async function runMovement(actor, label) {
+  for (const [cmd] of SCRIPTS.scripts[label] ?? []) {
+    if (cmd === 'step_end') break;
+    const dir = cmd.match(/_(up|down|left|right)$/)?.[1];
+    if (/^walk_in_place/.test(cmd) || /^face_(up|down|left|right)$/.test(cmd)) { if (dir) actor.facing = dir; await delayFrames(cmd.includes('faster') ? 4 : 8); }
+    else if (/^(walk|run|jump)_/.test(cmd) && dir) { startStep(actor, dir); await until(() => !actor.from); }
+    else if (cmd === 'face_player') faceToward(actor, player);
+    else if (cmd === 'face_away_player') { faceToward(actor, player); actor.facing = opposite[actor.facing]; }
+    else if (cmd === 'face_original_direction') actor.facing = actor.startFacing ?? actor.facing;
+    else if (/^delay_(\d+)$/.test(cmd)) await delayFrames(Number(cmd.split('_')[1]));
+    else if (cmd === 'emote_exclamation_mark') await showEmote(actor, '!');
+    else if (cmd === 'emote_question_mark') await showEmote(actor, '?');
+  }
+}
+let elapsed = 0, frameDt = 1 / 60;
+const delayFrames = (n) => { const end = elapsed + n / 60; return until(() => elapsed >= end); };
+async function showEmote(actor, mark) {
+  const el = $('emote');
+  el.textContent = mark; el.hidden = false; el.actor = actor;
+  await delayFrames(40);
+  el.hidden = true; el.actor = null;
+}
+
+async function runScript(label, target) {
+  if (!SCRIPTS.scripts[label]) return;
+  scriptRunning = true;
+  held.clear();
+  const ctx = { target, color: target ? TEXT_COLORS[value(SCRIPTS.textColors[target.gfx] ?? 'NPC_TEXT_COLOR_NEUTRAL')] ?? 'neutral' : 'neutral', style: 'normal', moves: [] };
+  const stack = [];
+  let body = SCRIPTS.scripts[label], pc = 0, switchValue = 0;
+  const jump = (to) => { if (SCRIPTS.scripts[to]) { body = SCRIPTS.scripts[to]; pc = 0; return true; } return false; };
+  try {
+    for (let steps = 0; steps < 2000; steps++) {
+      if (pc >= body.length) { if (!stack.length) break; ({ body, pc } = stack.pop()); continue; }
+      const [cmd, ...args] = body[pc++];
+      const cond = cmd.match(/^(goto|call)_if_(eq|ne|lt|gt|le|ge)$/);
+      if (cond) {
+        if (compare[cond[2]](value(args[0]), value(args[1]))) { if (cond[1] === 'call') stack.push({ body, pc }); jump(args[2]); }
+        continue;
+      }
+      const flagCond = cmd.match(/^(goto|call)_if_(set|unset)$/);
+      if (flagCond) {
+        if (story.flags.has(resolve(args[0])) === (flagCond[2] === 'set')) { if (flagCond[1] === 'call') stack.push({ body, pc }); jump(args[1]); }
+        continue;
+      }
+      switch (cmd) {
+        case 'end': stack.length = 0; pc = body.length; break;
+        case 'return': if (stack.length) ({ body, pc } = stack.pop()); else pc = body.length; break;
+        case 'goto': jump(args[0]); break;
+        case 'call': stack.push({ body, pc }); jump(args[0]); break;
+        case 'switch': switchValue = value(args[0]); break;
+        case 'case': if (switchValue === value(args[0])) jump(args[1]); break;
+        case 'setvar': story.vars[resolve(args[0])] = value(args[1]); break;
+        case 'copyvar': story.vars[resolve(args[0])] = value(args[1]); break;
+        case 'addvar': story.vars[resolve(args[0])] = value(args[0]) + value(args[1]); break;
+        case 'subvar': story.vars[resolve(args[0])] = value(args[0]) - value(args[1]); break;
+        case 'setflag': story.flags.add(resolve(args[0])); break;
+        case 'clearflag': story.flags.delete(resolve(args[0])); break;
+        case 'specialvar': story.vars[resolve(args[0])] = 0; break;
+        case 'checkplayergender': story.vars.VAR_RESULT = 0; break;
+        case 'waitfanfare': await delayFrames(150); break; // the jingle holds "Obtained …" on screen
+        case 'checkitemspace': story.vars.VAR_RESULT = 1; break; // there's no bag yet, so always room
+        case 'bufferitemname': case 'bufferspeciesname': case 'buffermovename':
+          // {STR_VAR_n} in the next text: ITEM_POTION -> POTION
+          NAMES[resolve(args[0])] = (args[1] ?? '').replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
+          break;
+        case 'faceplayer': if (target) faceToward(target, player); break;
+        case 'textcolor': ctx.color = TEXT_COLORS[value(args[0])] ?? ctx.color; break;
+        case 'signmsg': ctx.style = 'sign'; break;
+        case 'normalmsg': ctx.style = 'normal'; break;
+        case 'msgbox': {
+          const type = args[1] ?? 'MSGBOX_DEFAULT', text = SCRIPTS.text[args[0]];
+          if (type === 'MSGBOX_NPC' && target) faceToward(target, player);
+          if (text != null) await say(text, { style: type === 'MSGBOX_SIGN' ? 'sign' : ctx.style, color: type === 'MSGBOX_SIGN' ? 'neutral' : ctx.color });
+          if (type === 'MSGBOX_YESNO') story.vars.VAR_RESULT = await yesNo();
+          if (type === 'MSGBOX_NPC' || type === 'MSGBOX_SIGN' || type === 'MSGBOX_AUTOCLOSE') closeBox();
+          break;
+        }
+        case 'message': if (SCRIPTS.text[args[0]] != null) await say(SCRIPTS.text[args[0]], { style: ctx.style, color: ctx.color, wait: false }); break;
+        case 'waitbuttonpress': await until(takeA); break;
+        case 'closemessage': closeBox(); break;
+        case 'giveitem_msg': if (SCRIPTS.text[args[0]] != null) await say(SCRIPTS.text[args[0]], { color: ctx.color }); story.vars.VAR_RESULT = 1; break;
+        case 'giveitem': case 'finditem': {
+          const item = (args[0] ?? '').replace(/^ITEM_/, '').replace(/_/g, ' ');
+          await say(`${NAMES.PLAYER} obtained a ${item}!`);
+          story.vars.VAR_RESULT = 1;
+          break;
+        }
+        case 'trainerbattle_single': case 'trainerbattle_double': {
+          // Battles come later: show the challenge, then stop.
+          const intro = SCRIPTS.text[args[1]];
+          if (target) faceToward(target, player);
+          if (intro != null) await say(intro, { color: ctx.color });
+          pc = body.length; stack.length = 0;
+          break;
+        }
+        case 'applymovement': {
+          const actor = actorFor(args[0], ctx);
+          if (actor) ctx.moves.push(runMovement(actor, args[1]));
+          break;
+        }
+        case 'waitmovement': await Promise.all(ctx.moves); ctx.moves = []; break;
+        case 'delay': await delayFrames(value(args[0])); break;
+        case 'removeobject': { const a = actorFor(args[0], ctx); if (a && a !== player) { a.removed = true; a.root.visible = false; } break; }
+        case 'addobject': { const a = actorFor(args[0], ctx); if (a && a !== player) { a.removed = false; a.root.visible = true; } break; }
+        default: break; // lock, release, special, fanfares, battles, …: not needed to read the scene yet
+      }
+    }
+  } finally {
+    await Promise.all(ctx.moves);
+    closeBox();
+    $('yesno').hidden = true;
+    scriptRunning = false;
+    takeA();
+  }
+}
+
+// Keep a "!" or "?" bubble above the person showing it.
+function placeEmote() {
+  const el = $('emote');
+  if (el.hidden || !el.actor) return;
+  const v = el.actor.root.position.clone().add(new THREE.Vector3(0, 2.1, 0)).project(cam);
+  const r = canvas.getBoundingClientRect();
+  el.style.left = `${r.left + ((v.x + 1) / 2) * r.width}px`;
+  el.style.top = `${r.top + ((1 - v.y) / 2) * r.height}px`;
+}
+
+// What's in front of the player: a person (also across a counter), or a sign.
+function interact() {
+  const [dx, dy] = steps[player.facing];
+  const fx = player.x + dx, fy = player.y + dy;
+  const personAt = (x, y) => npcs.find((a) => a.area === area && !a.removed && !a.from && a.x === x && a.y === y && a.script);
+  let target = personAt(fx, fy);
+  if (!target && behaviorAt(fx, fy) === 'MB_COUNTER') target = personAt(fx + dx, fy + dy);
+  if (target) return runScript(target.script, target);
+  const c = locate(fx, fy);
+  const sign = c && c.m.D.signs.find((s) => s.x === c.x && s.y === c.y && s.type === 'sign' && s.script);
+  if (sign) return runScript(sign.script, null);
+}
+
 // ---- input: keyboard and d-pad ----
 const held = new Set();
 const keyDirs = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' };
@@ -784,6 +1100,9 @@ $('compareBtn').onclick = () => setCompare(!comparing());
 setCompare(location.hash === '#compare');
 
 function frame(dt) {
+  elapsed += dt;
+  frameDt = dt;
+  runWaiters();
   for (const a of areaActors()) {
     if (!a.from) continue;
     a.t += dt / (BB.stepSeconds * (a.jump ? 2 : 1));
@@ -794,7 +1113,10 @@ function frame(dt) {
       if (w && isStairs(w.behavior)) warp(w);
     }
   }
-  if (!player.from && !warping) {
+  if (scriptRunning) { /* the script moves people; nobody wanders */ }
+  else if (!player.from && !warping && buttons.aPressed) { buttons.aPressed = buttons.bPressed = false; interact(); }
+  else if (buttons.bPressed) buttons.bPressed = false;
+  else if (!player.from && !warping) {
     if (pendingStep) {
       // The step off a door or the stairs after arriving.
       const dirs = [].concat(pendingStep);
@@ -803,12 +1125,13 @@ function frame(dt) {
       if (dir) startStep(player, dir);
     } else playerInput(dt);
   }
-  for (const a of npcs) if (a.area === area) updateNpc(a, dt);
+  if (!scriptRunning) for (const a of npcs) if (a.area === area && !a.removed) updateNpc(a, dt);
   for (const a of areaActors()) placeActor(a, cam.position, settings.pitch);
   readout();
   if (orbit.enabled) orbit.update(); else followCamera();
   renderer.render(scene, cam);
   if (!$('gba').hidden) drawGba();
+  placeEmote();
 }
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
@@ -830,6 +1153,24 @@ window.pokered = {
     return this.where();
   },
   music,
+  story,
+  /** Start an event script by name, as if talking to no one in particular. */
+  run(label) { runScript(label, null); return this.tick(0.1); },
+  /** Press A (or B) once, then let some game time pass. */
+  async press(button = 'a', seconds = 0.5) {
+    buttons[button + 'Pressed'] = true;
+    await this.tick(seconds);
+    return this.text();
+  },
+  async tick(seconds) {
+    for (let t = 0; t < seconds; t += 1 / 30) frame(1 / 30);
+    await new Promise((r) => setTimeout(r, 0));
+    for (let t = 0; t < 0.1; t += 1 / 30) frame(1 / 30);
+  },
+  /** What the text box shows right now ('' when closed). */
+  text() {
+    return $('textbox').hidden ? '' : `[${$('textbox').dataset.style}/${$('textbox').dataset.color}] ${$('tb1').textContent} / ${$('tb2').textContent}`;
+  },
   where() {
     const c = locate(player.x, player.y);
     return `${c ? c.m.D.name : '?'} ${c ? `${c.x},${c.y}` : ''} facing ${player.facing}`;
