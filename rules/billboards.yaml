@@ -30,6 +30,6 @@ shadows:
 # is 16 frames at 60 fps; the walk frame shows for the first half).
 step_seconds: 0.267
 
-# Objects whose visibility flag matches one of these start hidden, as they do
-# on a new save file (Professor Oak in Pallet Town, for example).
-hidden_flags: ["FLAG_HIDE_*"]
+# Objects start hidden when a new save sets their visibility flag. Those flags
+# are read from the decomp's EventScript_ResetAllMapFlags, so Professor Oak
+# starts hidden while Blue and the starter Poke Balls wait in the lab.

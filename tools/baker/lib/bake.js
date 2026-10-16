@@ -5,7 +5,7 @@
 // as seen in its texture, and `uv` is the pixel rect [u0, v0, u1, v1] in the
 // atlas (v grows downward), so the texture's bottom edge maps to p0-p1.
 
-import { readMap, readLayout, tilesetPair, metatileFor, NUM_METATILES_IN_PRIMARY } from './decomp.js';
+import { readMap, readLayout, tilesetPair, metatileFor, mapNameById, newGame, NUM_METATILES_IN_PRIMARY } from './decomp.js';
 import { renderMetatile, Image, AtlasPacker } from './raster.js';
 import { readSprite } from './sprites.js';
 
@@ -49,6 +49,7 @@ export function bakeMap(name, rules, lookup) {
     }
     for (const c of cells) if (c.h === null) c.h = 0;
   }
+  if (heightRule.flat_indoors && map.map_type === 'MAP_TYPE_INDOOR') for (const c of cells) c.h = 0;
 
   // Nearest plain walkable ground for every cell: the texture to fill under
   // objects, and the background to cut out of them.
@@ -174,6 +175,11 @@ export function bakeMap(name, rules, lookup) {
 
   // ---- objects: per-column stacks, chunked from the bottom ----
   const objects = [];
+  // Indoors, freestanding props (beds, tables, machines) are drawn top-down in
+  // the art, so they become low blocks instead of standing up.
+  const blocks = S.blocks && (S.blocks.maps !== 'indoor' || map.map_type === 'MAP_TYPE_INDOOR') ? S.blocks : null;
+  const asBlock = (cls) => !!blocks?.classes.includes(cls);
+  const flatOverhangs = new Set();
   for (let x = 0; x < W; x++) {
     let y = H - 1;
     while (y >= 0) {
@@ -198,6 +204,17 @@ export function bakeMap(name, rules, lookup) {
         const bottom = chunk[0];
         const zf = bottom.y + 1;
         const h0 = bottom.h;
+        if (asBlock(cls)) {
+          // A walk-behind edge with nothing under it stays flat art.
+          if (chunk.every((c) => c.walkable)) { chunk.forEach((c) => flatOverhangs.add(c)); continue; }
+          // Low block: the art on a raised top, and a short front face.
+          const hb = blocks.height, zb = zf - chunk.length;
+          const uvTop = packer.add(stack([...chunk].reverse().map((c) => renderMetatile(pair, c.metatile))));
+          quad('block', [[x, h0 + hb, zf], [x + 1, h0 + hb, zf], [x + 1, h0 + hb, zb], [x, h0 + hb, zb]], uvTop);
+          quad('block', [[x, h0, zf], [x + 1, h0, zf], [x + 1, h0 + hb, zf], [x, h0 + hb, zf]], [uvTop[0], uvTop[3] - 3, uvTop[2], uvTop[3]]);
+          objects.push({ class: cls, x, y: bottom.y, rows: chunk.length, block: true });
+          continue;
+        }
         const ht = chunk.length * r.height_per_row;
         const lean = (r.lean * Math.PI) / 180;
         const top = [h0 + ht * Math.cos(lean), zf - ht * Math.sin(lean)];
@@ -216,7 +233,9 @@ export function bakeMap(name, rules, lookup) {
   const groundImg = new Image(W * 16, H * 16);
   for (const c of cells) {
     let img;
-    if (c.walkable && c.e.top) {
+    if (flatOverhangs.has(c)) {
+      img = renderMetatile(pair, c.metatile);
+    } else if (c.walkable && c.e.top) {
       img = renderMetatile(pair, c.metatile, { layers: [0] }); // overhang: ground is the first layer
     } else if (!inBuilding.has(c) && objectRules[standing.get(c)]?.ground === 'keep') {
       img = renderMetatile(pair, c.metatile);
@@ -245,6 +264,7 @@ export function bakeMap(name, rules, lookup) {
   for (const c of cells) {
     const [u, v] = [g[0] + c.x * 16, g[1] + c.y * 16];
     const { x, y: z, h } = c;
+    if (rules.classes[c.e.class].geometry === 'none') continue; // void: nothing to draw
     quad(c.e.class === 'water' ? 'water' : 'ground', [[x, h, z + 1], [x + 1, h, z + 1], [x + 1, h, z], [x, h, z]], [u, v, u + 16, v + 16]);
     if (!rules.height.step_faces) continue;
     for (const [dx, dy, dir] of DIRS) {
@@ -265,7 +285,7 @@ export function bakeMap(name, rules, lookup) {
 
   // ---- sprites ----
   const B = rules.billboards;
-  const hiddenRes = (B.hidden_flags ?? []).map((g) => new RegExp('^' + g.replace(/\*/g, '\\w*') + '$'));
+  const { hiddenFlags } = newGame();
   const sprites = {};
   for (const gfx of new Set([B.player, ...(map.object_events ?? []).map((o) => o.graphics_id)])) {
     try {
@@ -295,12 +315,16 @@ export function bakeMap(name, rules, lookup) {
         class: cells.map((c) => c.e.class),
       },
       connections: map.connections ?? [],
-      warps: map.warp_events ?? [],
+      indoor: map.map_type === 'MAP_TYPE_INDOOR',
+      warps: (map.warp_events ?? []).map((w) => ({
+        x: w.x, y: w.y, behavior: cells[idx(w.x, w.y)].e.behavior,
+        to: mapNameById(w.dest_map) ?? null, toWarp: Number(w.dest_warp_id),
+      })),
       objects: (map.object_events ?? []).map((o) => ({
         id: o.local_id, gfx: o.graphics_id, x: o.x, y: o.y, elevation: o.elevation,
         movement: o.movement_type, facing: facings[o.movement_type] ?? 'down',
         range: [o.movement_range_x ?? 0, o.movement_range_y ?? 0],
-        hidden: hiddenRes.some((re) => re.test(String(o.flag))), flag: o.flag, script: o.script,
+        hidden: hiddenFlags.has(o.flag), flag: o.flag, script: o.script,
       })),
       sprites,
       billboards: { player: B.player, lean: B.lean, matchScreenSize: B.match_screen_size, feetOffset: B.feet_offset, stepSeconds: B.step_seconds },

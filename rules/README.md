@@ -17,7 +17,7 @@ git and is regenerated locally.
 npm install
 npm run setup:decomp              # once: clones pret/pokefirered into vendor/
 npm run classify -- PalletTown    # classify + debug overlays
-npm run bake -- PalletTown Route1  # bake maps + a connected 3D preview
+npm run bake -- PalletTown Route1 PalletTown_PlayersHouse_2F   # bake maps + a 3D preview
 npm run serve                     # preview at http://localhost:5179 (large bakes won't open from disk)
 ```
 
@@ -27,7 +27,7 @@ Outputs:
 - `build/debug/classify.html`: map and tileset views; hover a cell to see why it got its class
 - `build/debug/maps/*_classes.png`, `build/debug/tilesets/*_classes.png`: the same overlays as images
 - `build/maps/<Map>/map.json` + `atlas.png`: the baked map (format below)
-- `build/debug/view3d.html`: 3D preview of every map in the bake, laid out by their connections with the first map at the origin. Walk with WASD across map edges, hop ledges, tune the camera, and compare against the original GBA view.
+- `build/debug/view3d.html`: 3D preview of every map in the bake. Connected outdoor maps form one area; each interior is its own area, reached through doors, exit mats and stairs. It starts where a new game does (Red's bedroom) when that map is in the bake. Walk with WASD, hop ledges, tune the camera, and compare against the original GBA view. `window.pokered.walk(dir, seconds)` drives it from a script.
 
 ## How a metatile gets its class
 
@@ -119,13 +119,23 @@ generated from the same data.
 | Animation tagging | **done** | Ranges read from `src/tileset_anims.c` |
 | Height | **done** | Cliffs on routes will need real elevation changes to test |
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
+| Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
 | Map connections | **done** | Maps placed by their connection offsets; walk across edges |
 | Prop grouping | partly | Buildings are grouped; objects are per-column chunks so far |
 | Billboards | **done** | Real overworld sprites from the decomp, yaw-only, screen-size matched, shadows, hidden flags (`billboards.yaml`) |
 | Materials and colour | later | Per-class shading, palette grading, water shader |
 | Per-map camera | **started** | Presets in `camera.yaml`; `rules/maps/<Map>.yaml` can pick one |
 
+## Interiors
+
+- **Void** (the black around rooms) is detected as blocked and at least 90% black. It draws nothing, and it ends wall columns like the map edge. Void in front of furniture counts as floor, since it's just the room's front edge.
+- **Freestanding props** (floor in front and behind, at most 3 rows) aren't walls. Indoors they become **low blocks** (`standup.yaml` `blocks`): art on a raised top with a short front face. Shelves, PCs and TVs (`furniture`, from behaviors) still stand.
+- **Interiors are flat** (`height.yaml` `flat_indoors`): indoor elevation only sorts sprites.
+- **Visibility** at the start comes from the decomp's new-game flag script, so Oak is hidden but Blue and the starters wait in the lab.
+- **Warps** follow FireRed: walk into a door, press the arrow's direction on an exit mat, or step onto stairs. Other cells listed as warps are inert.
+
 ### Known gaps
 
 - Rocky cliffs and mountain tops come out as `roof`. The geometry is right (a raised surface), but they want their own class once the height rule exists.
 - Shoreline metatiles that share animated water-edge tiles can come out as `ground` or `roof`.
+- NPCs with a variable sprite (`OBJ_EVENT_GFX_VAR_*`) are chosen at runtime by the game and show as a placeholder marker.

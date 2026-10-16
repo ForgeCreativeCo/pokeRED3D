@@ -1,0 +1,5 @@
+# Per-metatile overrides for this tileset. Ids are global metatile ids
+# (secondary tilesets start at 0x280). See rules/README.md.
+
+metatiles:
+  0x299: { class: ground, note: "exit doormat painted into the black row below the lab" }

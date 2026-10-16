@@ -16,5 +16,14 @@ wall_max_rows: 2
 # (fences, mailboxes) rather than buildings.
 prop_max_column: 1
 
+# Blocked metatiles this tall or less with floor both in front of and behind
+# them are freestanding furniture (a table, a lab machine), not walls. Even
+# small outdoor buildings are taller than this once their roof is counted.
+freestanding_max_rows: 3
+
+# Blocked metatiles at least this black are the void around interiors. Void
+# also ends blocked columns when measuring walls, like the map edge does.
+void_min_dark: 0.9
+
 # Blocked metatiles whose visible pixels are mostly green are trees.
 tree_min_green: 0.55

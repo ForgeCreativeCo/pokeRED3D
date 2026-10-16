@@ -111,6 +111,10 @@
     background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 16px #00000030;
   }
   #compareBtn[aria-pressed="true"] { background: var(--panel); color: var(--ink); border: 1px solid var(--panel-edge); }
+  /* Black fade when going through a door or up the stairs. */
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 1; }
+  #fade.on { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #fade { transition: none; } }
   #error { position: fixed; inset: auto 16px 16px; padding: 12px 14px; border-radius: 8px; background: var(--panel); border: 1px solid var(--accent); }
 </style>
 
@@ -130,7 +134,7 @@
       <dt>height</dt><dd id="rHeight">–</dd>
     </dl>
     <fieldset>
-      <legend>Camera</legend>
+      <legend id="legendCam">Camera</legend>
       <label class="slider" for="pitch">pitch <input type="range" id="pitch" min="25" max="90"> <output id="pitchOut"></output></label>
       <label class="slider" for="fov">fov <input type="range" id="fov" min="10" max="60"> <output id="fovOut"></output></label>
       <label class="slider" for="view">view <input type="range" id="view" min="6" max="30"> <output id="viewOut"></output></label>
@@ -149,6 +153,8 @@
     <p class="foot" id="foot"></p>
   </div>
 </details>
+
+<div id="fade" aria-hidden="true"></div>
 
 <div id="dpad" aria-label="Walk">
   <button type="button" data-dir="up" aria-label="Walk north">▲</button>
@@ -193,7 +199,7 @@ const maps = await Promise.all(WORLD.map(async (w) => {
   tex.colorSpace = THREE.SRGBColorSpace;
   const D = w.data;
   return {
-    D, G: D.grid, W: D.width, H: D.height, ox: w.ox, oy: w.oy, tex,
+    D, G: D.grid, W: D.width, H: D.height, ox: w.ox, oy: w.oy, area: w.area, tex,
     img: tex.image, AW: tex.image.width, AH: tex.image.height,
     mats: {
       lit: [new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
@@ -227,9 +233,15 @@ for (const m of maps) {
   scene.add(m.opaque, m.cutout);
 }
 
-// ---- the world grid: every map's cells in shared world coordinates ----
+// ---- areas: connected outdoor maps share one; each interior is its own ----
+let area = 0;
+const inArea = (m) => m.area === area;
+const areaMaps = () => maps.filter(inArea);
+const mapByName = (name) => maps.find((m) => m.D.name === name);
+
+// ---- the world grid: the current area's cells in shared world coordinates ----
 function locate(gx, gy) {
-  for (const m of maps) {
+  for (const m of areaMaps()) {
     const x = gx - m.ox, y = gy - m.oy;
     if (x >= 0 && y >= 0 && x < m.W && y < m.H) return { m, i: y * m.W + x, x, y };
   }
@@ -254,7 +266,7 @@ const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: t
 
 function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0] }, m) {
   const s = m.D.sprites[gfx];
-  const a = { gfx, s, m, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
+  const a = { gfx, s, m, area: m.area, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
   a.root = new THREE.Group();
   a.tilt = new THREE.Group();
   a.root.add(a.tilt);
@@ -289,17 +301,59 @@ function setFrame(a, frame, mirror) {
   uv.needsUpdate = true;
 }
 
-const home = maps[0];
-const start = home.D.warps[0] ? { x: home.D.warps[0].x + home.ox, y: home.D.warps[0].y + 1 + home.oy } : { x: home.ox + (home.W >> 1), y: home.oy + (home.H >> 1) };
-const player = makeActor({ gfx: BB.player, x: start.x, y: start.y }, home);
+// Start where a new game does (Red's bedroom) when that map is in the bake.
+const home = (START && mapByName(START.map)) || maps[0];
+const start = START && home.D.name === START.map ? { x: START.x + home.ox, y: START.y + home.oy }
+  : home.D.warps[0] ? { x: home.D.warps[0].x + home.ox, y: home.D.warps[0].y + 1 + home.oy } : { x: home.ox + (home.W >> 1), y: home.oy + (home.H >> 1) };
+area = home.area;
+const player = makeActor({ gfx: BB.player, x: start.x, y: start.y, facing: START?.facing ?? 'down' }, home);
 const npcs = maps.flatMap((m) => m.D.objects.filter((o) => !o.hidden).map((o) => makeActor({ ...o, x: o.x + m.ox, y: o.y + m.oy }, m)));
 const actors = [player, ...npcs];
+const areaActors = () => actors.filter((a) => a === player || a.area === area);
 
-const occupied = (x, y, self) => actors.some((a) => a !== self && ((a.x === x && a.y === y) || (a.from && a.from.x === x && a.from.y === y)));
+const occupied = (x, y, self) => areaActors().some((a) => a !== self && ((a.x === x && a.y === y) || (a.from && a.from.x === x && a.from.y === y)));
 const canEnter = (x, y, self) => walkable(x, y) && !occupied(x, y, self);
+// ---- warps ----
+// Like FireRed: walking into a door, pressing the arrow's direction on an exit
+// mat, or stepping onto stairs warps; other cells listed as warps are inert.
+const arrowDir = { MB_NORTH_ARROW_WARP: 'up', MB_SOUTH_ARROW_WARP: 'down', MB_WEST_ARROW_WARP: 'left', MB_EAST_ARROW_WARP: 'right' };
+const isDoor = (b) => b === 'MB_WARP_DOOR' || b === 'MB_CAVE_DOOR';
+const isStairs = (b) => /STAIR_WARP|LADDER|REGULAR_WARP|ESCALATOR/.test(b ?? '');
+function warpAt(gx, gy) {
+  const c = locate(gx, gy);
+  return c && c.m.D.warps.find((w) => w.x === c.x && w.y === c.y && w.to && mapByName(w.to));
+}
+let warping = false;
+function warp(w) {
+  const dest = mapByName(w.to), target = dest.D.warps[w.toWarp];
+  if (!target) return;
+  warping = true;
+  held.clear();
+  $('fade').classList.add('on');
+  setTimeout(() => {
+    area = dest.area;
+    Object.assign(player, { x: target.x + dest.ox, y: target.y + dest.oy, from: null, t: 1, jump: false });
+    applyAreaLook();
+    // Out through a door: step off it. Down stairs or up: step off the stairs.
+    // Onto an exit mat: face back into the room.
+    if (isDoor(target.behavior) || isStairs(target.behavior)) pendingStep = isDoor(target.behavior) ? 'down' : ['down', 'left', 'right', 'up'];
+    else if (arrowDir[target.behavior]) player.facing = { up: 'down', down: 'up', left: 'right', right: 'left' }[arrowDir[target.behavior]];
+    lastCell = '';
+    $('fade').classList.remove('on');
+    setTimeout(() => { warping = false; }, 200);
+  }, 220);
+}
+let pendingStep = null;
+
 function startStep(a, dir) {
   const [dx, dy] = steps[dir];
   a.facing = dir;
+  if (a === player) {
+    // Into a door, or off an exit mat in its arrow's direction.
+    const ahead = warpAt(a.x + dx, a.y + dy), here = warpAt(a.x, a.y);
+    if (ahead && isDoor(ahead.behavior)) { warp(ahead); return true; }
+    if (here && arrowDir[here.behavior] === dir) { warp(here); return true; }
+  }
   let to = null;
   // A ledge facing this way: hop over it to the cell beyond.
   if (behaviorAt(a.x + dx, a.y + dy) === jumpBehavior[dir] && canEnter(a.x + 2 * dx, a.y + 2 * dy, a)) to = { x: a.x + 2 * dx, y: a.y + 2 * dy, jump: true };
@@ -349,6 +403,8 @@ const gba = $('gba'), gctx = gba.getContext('2d');
 gba.width = 240; gba.height = 160;
 function drawGba() {
   gctx.imageSmoothingEnabled = false;
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 240, 160);
   const pp = actorPos(player);
   // FireRed keeps the player's cell at column 7, row 4 of the 15x10 screen.
   const ox = Math.round(pp.x * 16) - 112, oy = Math.round(pp.y * 16) - 64;
@@ -362,14 +418,14 @@ function drawGba() {
       gctx.drawImage(here.img, B[0] + bx * 16, B[1] + by * 16, 16, 16, tx * 16 - ox, ty * 16 - oy, 16, 16);
     }
   const layer = (key) => {
-    for (const m of maps) {
+    for (const m of areaMaps()) {
       const [u0, v0] = m.D.original[key];
       gctx.drawImage(m.img, u0, v0, m.W * 16, m.H * 16, m.ox * 16 - ox, m.oy * 16 - oy, m.W * 16, m.H * 16);
     }
   };
   layer('below');
   // Sprites, back to front; feet on the bottom of their cell.
-  for (const a of [...actors].sort((p, q) => actorPos(p).y - actorPos(q).y)) {
+  for (const a of areaActors().sort((p, q) => actorPos(p).y - actorPos(q).y)) {
     if (!a.s) continue;
     const p = actorPos(a);
     const [u0, v0] = a.s.frames[actorFrame(a)];
@@ -447,12 +503,15 @@ function playerInput(dt) {
 canvas.addEventListener('pointerdown', () => canvas.focus());
 
 // ---- camera ----
-const CAM = home.D.camera;
-const cam = new THREE.PerspectiveCamera(CAM.fov, 1, 0.1, 500);
+// Each camera preset (default outdoors, interior indoors) keeps its own tuning.
+const presetBaked = {};
+for (const m of maps) presetBaked[m.D.camera.preset] ??= { pitch: m.D.camera.pitch, fov: m.D.camera.fov, view: m.D.camera.view };
+const presetSettings = Object.fromEntries(Object.entries(presetBaked).map(([k, v]) => [k, { ...v }]));
+let preset = home.D.camera.preset;
+let settings = presetSettings[preset];
+const cam = new THREE.PerspectiveCamera(settings.fov, 1, 0.1, 500);
 const orbit = new OrbitControls(cam, canvas);
 orbit.enabled = false;
-const baked = { pitch: CAM.pitch, fov: CAM.fov, view: CAM.view };
-const settings = { ...baked };
 const syncSliders = () => {
   for (const k of ['pitch', 'fov', 'view']) { $(k).value = settings[k]; $(k + 'Out').textContent = settings[k]; }
 };
@@ -460,9 +519,9 @@ for (const k of ['pitch', 'fov', 'view']) {
   $(k).addEventListener('input', () => { settings[k] = +$(k).value; $(k + 'Out').textContent = settings[k]; });
 }
 syncSliders();
-$('reset').onclick = () => { Object.assign(settings, baked); syncSliders(); };
+$('reset').onclick = () => { Object.assign(settings, presetBaked[preset]); syncSliders(); };
 $('copy').onclick = () => {
-  const line = `  ${CAM.preset}: { pitch: ${settings.pitch}, fov: ${settings.fov}, view: ${settings.view} }`;
+  const line = `  ${preset}: { pitch: ${settings.pitch}, fov: ${settings.fov}, view: ${settings.view} }`;
   const showFallback = () => { const y = $('yaml'); y.value = line.trim(); y.hidden = false; y.select(); $('copied').textContent = 'Select and copy this line'; };
   try {
     navigator.clipboard.writeText(line).then(() => { $('copied').textContent = 'Copied'; $('yaml').hidden = true; }, showFallback);
@@ -476,6 +535,17 @@ $('shade').onchange = () => {
   const key = $('shade').checked ? 'lit' : 'flat';
   for (const m of maps) { m.opaque.material = m.mats[key][0]; m.cutout.material = m.mats[key][1]; }
 };
+// Only the current area is drawn; interiors sit in black and use their camera.
+function applyAreaLook() {
+  for (const m of maps) m.opaque.visible = m.cutout.visible = inArea(m);
+  for (const a of npcs) a.root.visible = a.area === area;
+  scene.background.set(areaMaps().some((m) => m.D.indoor) ? '#000000' : '#9fd3e8');
+  const p = areaMaps()[0].D.camera.preset;
+  if (p !== preset) { preset = p; settings = presetSettings[p]; syncSliders(); }
+  $('legendCam').textContent = `Camera · ${preset}`;
+}
+applyAreaLook();
+
 // Small screens start with the panel folded so the map is visible.
 if (matchMedia('(max-width: 600px)').matches) $('panel').open = false;
 
@@ -521,22 +591,57 @@ function setCompare(on) {
 $('compareBtn').onclick = () => setCompare(!comparing());
 setCompare(location.hash === '#compare');
 
-let last = performance.now();
-renderer.setAnimationLoop((now) => {
-  const dt = Math.min((now - last) / 1000, 0.1); last = now;
-  for (const a of actors) {
+function frame(dt) {
+  for (const a of areaActors()) {
     if (!a.from) continue;
     a.t += dt / (BB.stepSeconds * (a.jump ? 2 : 1));
-    if (a.t >= 1) { a.from = null; a.t = 1; a.jump = false; }
+    if (a.t >= 1) {
+      a.from = null; a.t = 1; a.jump = false;
+      // Stepping onto stairs takes them.
+      const w = a === player && warpAt(a.x, a.y);
+      if (w && isStairs(w.behavior)) warp(w);
+    }
   }
-  if (!player.from) playerInput(dt);
-  for (const a of npcs) updateNpc(a, dt);
-  for (const a of actors) placeActor(a, cam.position, settings.pitch);
+  if (!player.from && !warping) {
+    if (pendingStep) {
+      // The step off a door or the stairs after arriving.
+      const dirs = [].concat(pendingStep);
+      pendingStep = null;
+      const dir = dirs.find((d) => canEnter(player.x + steps[d][0], player.y + steps[d][1], player));
+      if (dir) startStep(player, dir);
+    } else playerInput(dt);
+  }
+  for (const a of npcs) if (a.area === area) updateNpc(a, dt);
+  for (const a of areaActors()) placeActor(a, cam.position, settings.pitch);
   readout();
   if (orbit.enabled) orbit.update(); else followCamera();
   renderer.render(scene, cam);
   if (!$('gba').hidden) drawGba();
+}
+let last = performance.now();
+renderer.setAnimationLoop((now) => {
+  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+  frame(dt);
 });
+
+// Test hook: drive the game by hand (e.g. when the page is in a background tab
+// and animation frames are paused). Holds a direction for some seconds of game
+// time, then reports where the player is.
+window.pokered = {
+  async walk(dir, seconds) {
+    held.add(dir);
+    for (let t = 0; t < seconds; t += 1 / 30) frame(1 / 30);
+    held.delete(dir);
+    for (let t = 0; t < 0.6; t += 1 / 30) frame(1 / 30); // finish the step
+    await new Promise((r) => setTimeout(r, 450)); // let a warp's fade finish
+    for (let t = 0; t < 0.6; t += 1 / 30) frame(1 / 30);
+    return this.where();
+  },
+  where() {
+    const c = locate(player.x, player.y);
+    return `${c ? c.m.D.name : '?'} ${c ? `${c.x},${c.y}` : ''} facing ${player.facing}`;
+  },
+};
 </script>
 <script>
 // If the 3D library can't load, say so instead of showing a blank sky.

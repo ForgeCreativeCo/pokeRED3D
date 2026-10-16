@@ -20,3 +20,7 @@ inherit: [0, 15]
 # Where neighbouring cells differ in height, a vertical face fills the gap.
 # Its texture is the higher cell's bottom edge, stretched down.
 step_faces: true
+
+# Indoors, elevation only sorts sprites (the cells around Red's bed are
+# elevation 4), so interiors are drawn flat.
+flat_indoors: true

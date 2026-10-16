@@ -36,11 +36,13 @@ const keyOf = (pair, id) => `${(id < NUM_METATILES_IN_PRIMARY ? pair.primary : p
  * Gather placement statistics for every metatile of the given tilesets, from
  * every layout that uses any of them.
  */
-function gatherStats(tilesetSymbols) {
+const blankStat = () => ({ placements: 0, walkable: 0, wallDepth: [], column: [], freestanding: 0, below: [] });
+
+function gatherStats(tilesetSymbols, cfg) {
   const wanted = new Set(tilesetSymbols);
-  const stats = new Map(); // key -> { placements, walkable, wallDepth[], column[], below[] }
+  const stats = new Map(); // key -> blankStat()
   const stat = (key) => {
-    if (!stats.has(key)) stats.set(key, { placements: 0, walkable: 0, wallDepth: [], column: [], below: [] });
+    if (!stats.has(key)) stats.set(key, blankStat());
     return stats.get(key);
   };
 
@@ -50,6 +52,9 @@ function gatherStats(tilesetSymbols) {
     const pair = tilesetPair(layout);
     const { width: w, height: h, cells } = layout;
     const at = (x, y) => cells[y * w + x];
+    const isVoid = (c) => darkness(pair, c.metatile) >= cfg.void_min_dark;
+    // Void (the black around interiors) ends a blocked column like the map edge does.
+    const solid = (x, y) => y >= 0 && y < h && at(x, y).collision && !isVoid(at(x, y));
 
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
@@ -61,18 +66,39 @@ function gatherStats(tilesetSymbols) {
           if (y + 1 < h) s.below.push(keyOf(pair, at(x, y + 1).metatile));
           continue;
         }
+        if (isVoid(c)) continue;
         // Rows from here down to walkable ground (1 = directly above it).
         let down = 0;
-        while (y + down < h && at(x, y + down).collision) down++;
-        s.wallDepth.push(y + down < h ? down : Infinity);
+        while (solid(x, y + down)) down++;
+        // Void in front counts as floor: it's just the room's front edge.
+        const groundBelow = y + down < h && (!at(x, y + down).collision || isVoid(at(x, y + down)));
+        s.wallDepth.push(groundBelow ? down : Infinity);
         // Height of the whole blocked column through this cell.
         let up = 0;
-        while (y - up - 1 >= 0 && at(x, y - up - 1).collision) up++;
-        const touchesEdge = y - up === 0 || y + down >= h;
-        s.column.push(touchesEdge ? Infinity : up + down);
+        while (solid(x, y - up - 1)) up++;
+        const top = y - up;
+        const open = (yy) => yy >= 0 && yy < h && !at(x, yy).collision;
+        s.column.push(open(top - 1) && groundBelow ? up + down : Infinity);
+        // Floor in front and floor behind: furniture, not a building wall.
+        // (Buildings are taller than freestanding_max_rows.)
+        if (groundBelow && open(top - 1)) s.freestanding++;
       }
   }
   return stats;
+}
+
+const darknessCache = new Map();
+/** Fraction of a metatile's pixels that are (near) black. */
+function darkness(pair, id) {
+  // Primary metatiles take palettes from the secondary tileset too, so the key
+  // includes the whole pair.
+  const key = `${pair.primary.key}/${pair.secondary.key}:${id}`;
+  if (darknessCache.has(key)) return darknessCache.get(key);
+  const img = renderMetatile(pair, id);
+  let dark = 0;
+  for (let p = 0; p < 256; p++) if (img.data[p * 4] + img.data[p * 4 + 1] + img.data[p * 4 + 2] < 60) dark++;
+  darknessCache.set(key, dark / 256);
+  return dark / 256;
 }
 
 /** Fraction of a metatile's foreground pixels that are green. */
@@ -108,7 +134,7 @@ function layerMask(pair, mt, layer) {
 export function classifyTilesets(tilesetSymbols, rules) {
   const cfg = rules.classifier;
   const names = behaviorNames();
-  const stats = gatherStats(tilesetSymbols);
+  const stats = gatherStats(tilesetSymbols, cfg);
   const result = new Map();
   const byKey = new Map();
 
@@ -122,7 +148,7 @@ export function classifyTilesets(tilesetSymbols, rules) {
 
     const entries = ts.metatiles.map((mt) => {
       const id = base + mt.index;
-      const s = stats.get(`${ts.key}:${id}`) ?? { placements: 0, walkable: 0, wallDepth: [], column: [], below: [] };
+      const s = stats.get(`${ts.key}:${id}`) ?? blankStat();
       const coverage = layerCoverage(pair, mt);
       const behaviorName = names.get(mt.behavior) ?? `0x${mt.behavior.toString(16)}`;
       const walkRatio = s.placements ? s.walkable / s.placements : null;
@@ -157,16 +183,26 @@ export function classifyTilesets(tilesetSymbols, rules) {
           return { class: 'ground', source: 'auto' };
         }
         entry.reasons.push(`blocked ${((1 - walkRatio) * 100).toFixed(0)}%`);
-        const green = greenness(pair, id, coverage);
-        entry.stats.green = Number(green.toFixed(2));
-        if (green >= cfg.tree_min_green) {
-          entry.reasons.push(`green ${(green * 100).toFixed(0)}%`);
-          return { class: 'tree', source: 'auto' };
+        const dark = darkness(pair, id);
+        if (dark >= cfg.void_min_dark) {
+          entry.reasons.push(`${(dark * 100).toFixed(0)}% black`);
+          return { class: 'void', source: 'auto' };
         }
         const depth = median(s.wallDepth), column = median(s.column);
         if (column <= cfg.prop_max_column) {
           entry.reasons.push(`blocked column ${column} tall`);
           return { class: 'prop', source: 'auto' };
+        }
+        const blocked = s.placements - s.walkable;
+        if (column <= cfg.freestanding_max_rows && s.freestanding >= blocked / 2) {
+          entry.reasons.push(`freestanding, ${column} rows with floor in front and behind`);
+          return { class: 'prop', source: 'auto' };
+        }
+        const green = greenness(pair, id, coverage);
+        entry.stats.green = Number(green.toFixed(2));
+        if (green >= cfg.tree_min_green) {
+          entry.reasons.push(`green ${(green * 100).toFixed(0)}%`);
+          return { class: 'tree', source: 'auto' };
         }
         if (depth <= cfg.wall_max_rows) {
           entry.reasons.push(`${depth} row(s) above ground`);

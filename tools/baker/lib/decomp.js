@@ -102,6 +102,22 @@ export function tilesetDir(symbol) {
     for (const [, name, kind, key] of src.matchAll(/gMetatiles_(\w+)\[\]\s*=\s*INCBIN_U16\("data\/tilesets\/(primary|secondary)\/(\w+)\/metatiles\.bin"\)/g)) {
       tilesetDirsCache.set(`gTileset_${name}`, { dir: decompPath('data/tilesets', kind, key), kind, key });
     }
+    // Some tilesets borrow another's graphics (SilphCo uses Condominiums), so
+    // tiles and palettes come from the header's .tiles / .palettes symbols.
+    const gfx = fs.readFileSync(decompPath('src/data/tilesets/graphics.h'), 'utf8');
+    const gfxDir = new Map();
+    for (const [, sym, file] of gfx.matchAll(/(gTileset(?:Tiles|Palettes)_\w+)\[\](?:\[16\])?\s*=\s*\{?\s*INCBIN_U(?:16|32)\("([^"]+)"\)/g)) {
+      gfxDir.set(sym, path.dirname(file));
+    }
+    const headers = fs.readFileSync(decompPath('src/data/tilesets/headers.h'), 'utf8');
+    for (const [, name, body] of headers.matchAll(/struct Tileset (gTileset_\w+) =\s*\{([\s\S]*?)\};/g)) {
+      const entry = tilesetDirsCache.get(name);
+      if (!entry) continue;
+      const tiles = body.match(/\.tiles\s*=\s*(\w+)/)?.[1], pals = body.match(/\.palettes\s*=\s*(\w+)/)?.[1];
+      if (gfxDir.has(tiles)) entry.tilesDir = decompPath(gfxDir.get(tiles));
+      // Palette files live in <tileset>/palettes; keep the tileset folder.
+      if (gfxDir.has(pals)) entry.palDir = decompPath(path.dirname(gfxDir.get(pals)));
+    }
   }
   const found = tilesetDirsCache.get(symbol);
   if (!found) throw new Error(`No metatiles entry for ${symbol} in src/data/tilesets/metatiles.h`);
@@ -116,7 +132,7 @@ function readJascPal(file) {
 const tilesetCache = new Map();
 export function readTileset(symbol) {
   if (tilesetCache.has(symbol)) return tilesetCache.get(symbol);
-  const { dir, kind, key } = tilesetDir(symbol);
+  const { dir, kind, key, tilesDir = dir, palDir = dir } = tilesetDir(symbol);
 
   const metaBuf = fs.readFileSync(path.join(dir, 'metatiles.bin'));
   const attrBuf = fs.readFileSync(path.join(dir, 'metatile_attributes.bin'));
@@ -141,11 +157,11 @@ export function readTileset(symbol) {
     });
   }
 
-  const png = PNG.sync.read(fs.readFileSync(path.join(dir, 'tiles.png')), { skipRescale: true });
-  const palettes = fs.readdirSync(path.join(dir, 'palettes'))
+  const png = PNG.sync.read(fs.readFileSync(path.join(tilesDir, 'tiles.png')), { skipRescale: true });
+  const palettes = fs.readdirSync(path.join(palDir, 'palettes'))
     .filter((f) => f.endsWith('.pal'))
     .sort()
-    .map((f) => readJascPal(path.join(dir, 'palettes', f)));
+    .map((f) => readJascPal(path.join(palDir, 'palettes', f)));
 
   const ts = { symbol, key, kind, dir, metatiles, palettes, tilesPng: png, tileIndices: pngToIndices(png) };
   tilesetCache.set(symbol, ts);
@@ -210,4 +226,22 @@ export function tileAnimations() {
     animCache.push({ name, tileset: `gTileset_${name.split('_')[0]}`, start: Number(start), count: Number(count) });
   }
   return animCache;
+}
+
+// ---- new game ----
+
+let newGameCache;
+/**
+ * What a fresh save looks like: the flags EventScript_ResetAllMapFlags sets
+ * (objects hidden at the start), and where new_game.c drops the player.
+ */
+export function newGame() {
+  if (newGameCache) return newGameCache;
+  const scripts = fs.readFileSync(decompPath('data/event_scripts.s'), 'utf8');
+  const body = scripts.match(/^EventScript_ResetAllMapFlags::\s*\n([\s\S]*?)^\s*end\b/m)?.[1] ?? '';
+  const flags = [...body.matchAll(/setflag\s+(FLAG_\w+)/g)].map((m) => m[1]);
+  const src = fs.readFileSync(decompPath('src/new_game.c'), 'utf8');
+  const warp = src.match(/SetWarpDestination\(MAP_GROUP\((MAP_\w+)\),\s*MAP_NUM\(\1\),\s*-?\d+,\s*(\d+),\s*(\d+)\)/);
+  newGameCache = { hiddenFlags: new Set(flags), start: warp ? { map: mapNameById(warp[1]), x: Number(warp[2]), y: Number(warp[3]) } : null };
+  return newGameCache;
 }

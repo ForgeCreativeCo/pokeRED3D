@@ -49,3 +49,13 @@ object_cutout: background
 # Ground under objects and buildings: the flat art there still has the object
 # painted in it, so it's replaced (see `ground` above; default nearest).
 shade_amount: 0.45   # how much `shade` darkens
+
+# Low blocks. Indoor furniture (beds, tables, the lab's machine) is drawn
+# top-down in the art, so standing it up shows the floor behind it as a wall.
+# Instead it becomes a low block: the art on a raised top, with a short front
+# face. Shelves, PCs and TVs are `furniture` and still stand, since their art
+# is drawn from the front.
+blocks:
+  maps: indoor     # indoor maps only; outdoors, props really are upright
+  classes: [prop]
+  height: 0.45     # tiles
