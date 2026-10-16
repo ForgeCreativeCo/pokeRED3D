@@ -92,21 +92,25 @@ const ng = newGame().start;
 const start = ng && baked.has(ng.map) ? { ...ng, facing: 'down' } : null;
 console.log(`\nWorld: ${areas} area(s); start ${start ? `${start.map} ${start.x},${start.y}` : `outside ${names[0]}'s first door`}`);
 
-// Music: every song the baked maps play, with the samples they share.
+// Scripts and text for every person, sign, step-on trigger and map script in the bake.
+const roots = world.flatMap((w) => [
+  ...w.data.objects.map((o) => o.script), ...w.data.signs.map((s) => s.script),
+  ...w.data.triggers.map((t) => t.script), w.data.mapScripts,
+]);
+const scripts = { ...bakeScripts(roots), startFlags: [...newGame().hiddenFlags] };
+console.log(`Scripts: ${Object.keys(scripts.scripts).length} scripts, ${Object.keys(scripts.text).length} texts`);
+
+// Music: every song the maps play, plus any a script switches to, with the samples they share.
+const scriptSongs = Object.values(scripts.scripts).flat().filter(([cmd]) => cmd === 'playbgm' || cmd === 'savebgm').map(([, mus]) => mus);
 const music = { songs: {}, samples: {}, waves: {} };
-for (const m of new Set(world.map((w) => w.data.music))) {
-  const r = m && bakeSong(m);
-  if (!r) { if (m) console.warn(`  no song data for ${m}`); continue; }
+for (const m of new Set([...world.map((w) => w.data.music), ...scriptSongs])) {
+  const r = m && m !== 'MUS_DUMMY' && bakeSong(m);
+  if (!r) { if (m && m !== 'MUS_DUMMY') console.warn(`  no song data for ${m}`); continue; }
   music.songs[m] = r.song;
   Object.assign(music.samples, r.samples);
   Object.assign(music.waves, r.waves);
 }
 console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.samples).length} samples)`);
-
-// Scripts and text for every person and sign in the bake.
-const roots = world.flatMap((w) => [...w.data.objects.map((o) => o.script), ...w.data.signs.map((s) => s.script)]);
-const scripts = { ...bakeScripts(roots), startFlags: [...newGame().hiddenFlags] };
-console.log(`Scripts: ${Object.keys(scripts.scripts).length} scripts, ${Object.keys(scripts.text).length} texts`);
 
 // The preview inlines everything so it opens straight from disk.
 const html = fs.readFileSync(path.join(import.meta.dirname, 'debug/view3d.html'), 'utf8')

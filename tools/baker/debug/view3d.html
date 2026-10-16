@@ -322,9 +322,9 @@ const walkFrames = { down: [3, 4], up: [5, 6], left: [7, 8], right: [7, 8] };
 const JUMP_HEIGHT = 0.6; // tiles at the top of a ledge hop
 const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 
-function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0], id = null, script = null }, m) {
+function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0], id = null, script = null, flag = null, hidden = false }, m) {
   const s = m.D.sprites[gfx];
-  const a = { gfx, s, m, area: m.area, id, script, startFacing: facing, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
+  const a = { gfx, s, m, area: m.area, id, script, flag, removed: hidden, startFacing: facing, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
   a.root = new THREE.Group();
   a.tilt = new THREE.Group();
   a.root.add(a.tilt);
@@ -365,7 +365,7 @@ const start = START && home.D.name === START.map ? { x: START.x + home.ox, y: ST
   : home.D.warps[0] ? { x: home.D.warps[0].x + home.ox, y: home.D.warps[0].y + 1 + home.oy } : { x: home.ox + (home.W >> 1), y: home.oy + (home.H >> 1) };
 area = home.area;
 const player = makeActor({ gfx: BB.player, x: start.x, y: start.y, facing: START?.facing ?? 'down' }, home);
-const npcs = maps.flatMap((m) => m.D.objects.filter((o) => !o.hidden).map((o) => makeActor({ ...o, x: o.x + m.ox, y: o.y + m.oy }, m)));
+const npcs = maps.flatMap((m) => m.D.objects.map((o) => makeActor({ ...o, x: o.x + m.ox, y: o.y + m.oy }, m)));
 const actors = [player, ...npcs];
 const areaActors = () => actors.filter((a) => a === player || a.area === area);
 
@@ -384,22 +384,27 @@ function warpAt(gx, gy) {
 let warping = false;
 function warp(w) {
   const dest = mapByName(w.to), target = dest.D.warps[w.toWarp];
-  if (!target) return;
+  if (target) warpTo(dest, target.x, target.y, target.behavior);
+}
+/** Fade out, move the player to (x, y) on dest, run its map scripts, fade in. */
+function warpTo(dest, x, y, arriveBehavior = null) {
   warping = true;
   held.clear();
   $('fade').classList.add('on');
-  setTimeout(() => {
+  return new Promise((done) => setTimeout(() => {
     area = dest.area;
-    Object.assign(player, { x: target.x + dest.ox, y: target.y + dest.oy, from: null, t: 1, jump: false });
+    Object.assign(player, { x: x + dest.ox, y: y + dest.oy, from: null, t: 1, jump: false, invisible: false });
+    player.root.visible = true; // a scene may have hidden the player walking through a door
+    enterMap(dest, true);
     applyAreaLook();
     // Out through a door: step off it. Down stairs or up: step off the stairs.
     // Onto an exit mat: face back into the room.
-    if (isDoor(target.behavior) || isStairs(target.behavior)) pendingStep = isDoor(target.behavior) ? 'down' : ['down', 'left', 'right', 'up'];
-    else if (arrowDir[target.behavior]) player.facing = { up: 'down', down: 'up', left: 'right', right: 'left' }[arrowDir[target.behavior]];
+    if (isDoor(arriveBehavior) || isStairs(arriveBehavior)) pendingStep = isDoor(arriveBehavior) ? 'down' : ['down', 'left', 'right', 'up'];
+    else if (arrowDir[arriveBehavior]) player.facing = opposite[arrowDir[arriveBehavior]];
     lastCell = '';
     $('fade').classList.remove('on');
-    setTimeout(() => { warping = false; }, 200);
-  }, 220);
+    setTimeout(() => { warping = false; done(); }, 200);
+  }, 220));
 }
 let pendingStep = null;
 
@@ -504,7 +509,7 @@ function readout() {
   if (!c || key === lastCell) return;
   lastCell = key;
   $('title').textContent = pretty(c.m.D.name);
-  music.play(c.m.D.music);
+  if (c.m !== currentMap) enterMap(c.m, false); // walked across a map edge (or the first frame)
   $('rCell').textContent = `${c.x}, ${c.y}  (elevation ${c.m.G.elevation[c.i]}, facing ${player.facing})`;
   $('rClass').textContent = c.m.G.class[c.i];
   $('rBehavior').textContent = c.m.G.behavior[c.i];
@@ -721,7 +726,7 @@ const story = {
   flags: new Set(SCRIPTS.startFlags),
   vars: {},
 };
-let scriptRunning = false;
+let scriptDepth = 0, scriptRunning = false, lastCommand = '';
 const frameWaiters = [];
 /** Resolves once cond() is true, checked every game frame. */
 const until = (cond) => new Promise((resolve) => frameWaiters.push({ cond, resolve }));
@@ -829,12 +834,65 @@ function value(a) {
   const v = resolve(a);
   if (/^VAR_/.test(v)) return v === 'VAR_FACING' ? DIR_NUM[player.facing] : story.vars[v] ?? 0;
   const n = Number(v);
-  return Number.isNaN(n) ? 0 : n;
+  return Number.isNaN(n) ? v : n;
 }
 const compare = { eq: (a, b) => a === b, ne: (a, b) => a !== b, lt: (a, b) => a < b, gt: (a, b) => a > b, le: (a, b) => a <= b, ge: (a, b) => a >= b };
-function actorFor(localId, ctx) {
-  if (localId === 'LOCALID_PLAYER' || localId === 'OBJ_EVENT_ID_PLAYER') return player;
-  return areaActors().find((a) => a.id === localId) ?? (localId === 'VAR_LAST_TALKED' ? ctx.target : null);
+function actorFor(ref, ctx) {
+  if (ref === 'VAR_LAST_TALKED') return ctx.target;
+  const id = /^VAR_/.test(resolve(ref)) ? value(ref) : resolve(ref); // a var can hold a local id
+  if (id === 'LOCALID_PLAYER' || id === 'OBJ_EVENT_ID_PLAYER') return player;
+  return areaActors().find((a) => a.id === id) ?? null;
+}
+/** A scripted step: no collision or warp checks, the script knows the way. */
+function forceStep(a, dir) {
+  const [dx, dy] = steps[dir];
+  a.facing = dir;
+  a.from = { x: a.x, y: a.y };
+  a.x += dx; a.y += dy; a.t = 0; a.jump = false;
+  a.parity ^= 1;
+}
+const MOVEMENT_FACING = { MOVEMENT_TYPE_FACE_UP: 'up', MOVEMENT_TYPE_FACE_DOWN: 'down', MOVEMENT_TYPE_FACE_LEFT: 'left', MOVEMENT_TYPE_FACE_RIGHT: 'right' };
+
+// ---- map scripts: run on entering a map, and every frame from its table ----
+let currentMap = null, savedBgm = null;
+/** { MAP_SCRIPT_ON_TRANSITION: label, ... } for a map */
+function mapScriptTable(m) {
+  return Object.fromEntries((SCRIPTS.scripts[m.D.mapScripts] ?? []).filter(([c]) => c === 'map_script').map(([, type, label]) => [type, label]));
+}
+/** First map_script_2 entry whose var holds its value. */
+function pickTable(label) {
+  return (SCRIPTS.scripts[label] ?? []).find(([c, v, val]) => c === 'map_script_2' && value(v) === value(val))?.[3];
+}
+/** Show or hide people by their visibility flags, as the game does when a map loads. */
+function refreshObjects() {
+  for (const a of npcs) {
+    if (a.area !== area) continue;
+    a.removed = !!a.flag && a.flag !== '0' && story.flags.has(a.flag);
+    a.root.visible = !a.removed && !a.invisible;
+  }
+}
+function enterMap(m, warped) {
+  currentMap = m;
+  // FireRed clears the temporary vars and flags whenever a map loads.
+  for (const k of Object.keys(story.vars)) if (k.startsWith('VAR_TEMP_')) delete story.vars[k];
+  for (const fl of [...story.flags]) if (fl.startsWith('FLAG_TEMP_')) story.flags.delete(fl);
+  savedBgm = null;
+  const table = mapScriptTable(m);
+  if (table.MAP_SCRIPT_ON_TRANSITION) runScript(table.MAP_SCRIPT_ON_TRANSITION, null);
+  refreshObjects();
+  const onWarp = warped && table.MAP_SCRIPT_ON_WARP_INTO_MAP_TABLE && pickTable(table.MAP_SCRIPT_ON_WARP_INTO_MAP_TABLE);
+  if (onWarp) runScript(onWarp, null);
+  if (!story.flags.has('FLAG_DONT_TRANSITION_MUSIC')) music.play(savedBgm ?? m.D.music);
+}
+/** A map's per-frame script whose condition holds, if any (the opening scenes start this way). */
+function frameScript() {
+  const label = currentMap && mapScriptTable(currentMap).MAP_SCRIPT_ON_FRAME_TABLE;
+  return label ? pickTable(label) : null;
+}
+/** A step-on trigger under the player whose var holds its value. */
+function triggerAt(x, y) {
+  const c = locate(x, y);
+  return c && c.m.D.triggers.find((t) => t.x === c.x && t.y === c.y && value(t.var) === value(t.value));
 }
 const faceToward = (a, b) => {
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -845,7 +903,9 @@ async function runMovement(actor, label) {
     if (cmd === 'step_end') break;
     const dir = cmd.match(/_(up|down|left|right)$/)?.[1];
     if (/^walk_in_place/.test(cmd) || /^face_(up|down|left|right)$/.test(cmd)) { if (dir) actor.facing = dir; await delayFrames(cmd.includes('faster') ? 4 : 8); }
-    else if (/^(walk|run|jump)_/.test(cmd) && dir) { startStep(actor, dir); await until(() => !actor.from); }
+    else if (/^(walk|run|jump|player_run)_/.test(cmd) && dir) { forceStep(actor, dir); await until(() => !actor.from); }
+    else if (cmd === 'set_invisible') { actor.invisible = true; actor.root.visible = false; }
+    else if (cmd === 'set_visible') { actor.invisible = false; actor.root.visible = !actor.removed; }
     else if (cmd === 'face_player') faceToward(actor, player);
     else if (cmd === 'face_away_player') { faceToward(actor, player); actor.facing = opposite[actor.facing]; }
     else if (cmd === 'face_original_direction') actor.facing = actor.startFacing ?? actor.facing;
@@ -865,7 +925,7 @@ async function showEmote(actor, mark) {
 
 async function runScript(label, target) {
   if (!SCRIPTS.scripts[label]) return;
-  scriptRunning = true;
+  scriptDepth++; scriptRunning = true;
   held.clear();
   const ctx = { target, color: target ? TEXT_COLORS[value(SCRIPTS.textColors[target.gfx] ?? 'NPC_TEXT_COLOR_NEUTRAL')] ?? 'neutral' : 'neutral', style: 'normal', moves: [] };
   const stack = [];
@@ -875,6 +935,7 @@ async function runScript(label, target) {
     for (let steps = 0; steps < 2000; steps++) {
       if (pc >= body.length) { if (!stack.length) break; ({ body, pc } = stack.pop()); continue; }
       const [cmd, ...args] = body[pc++];
+      lastCommand = `${label}: ${cmd} ${args.join(', ')}`;
       const cond = cmd.match(/^(goto|call)_if_(eq|ne|lt|gt|le|ge)$/);
       if (cond) {
         if (compare[cond[2]](value(args[0]), value(args[1]))) { if (cond[1] === 'call') stack.push({ body, pc }); jump(args[2]); }
@@ -897,14 +958,21 @@ async function runScript(label, target) {
         case 'addvar': story.vars[resolve(args[0])] = value(args[0]) + value(args[1]); break;
         case 'subvar': story.vars[resolve(args[0])] = value(args[0]) - value(args[1]); break;
         case 'setflag': story.flags.add(resolve(args[0])); break;
-        case 'clearflag': story.flags.delete(resolve(args[0])); break;
+        case 'clearflag': {
+          const fl = resolve(args[0]);
+          story.flags.delete(fl);
+          // A person hidden by this flag reappears at their spot, as when the game respawns objects.
+          for (const a of npcs) if (a.area === area && a.flag === fl && a.removed) { a.removed = false; a.root.visible = !a.invisible; }
+          break;
+        }
         case 'specialvar': story.vars[resolve(args[0])] = 0; break;
         case 'checkplayergender': story.vars.VAR_RESULT = 0; break;
         case 'waitfanfare': await delayFrames(150); break; // the jingle holds "Obtained …" on screen
         case 'checkitemspace': story.vars.VAR_RESULT = 1; break; // there's no bag yet, so always room
         case 'bufferitemname': case 'bufferspeciesname': case 'buffermovename':
           // {STR_VAR_n} in the next text: ITEM_POTION -> POTION
-          NAMES[resolve(args[0])] = (args[1] ?? '').replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
+          // The name may come from a variable holding it (PLAYER_STARTER_SPECIES -> SPECIES_BULBASAUR).
+          NAMES[resolve(args[0])] = String(value(args[1] ?? '')).replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
           break;
         case 'faceplayer': if (target) faceToward(target, player); break;
         case 'textcolor': ctx.color = TEXT_COLORS[value(args[0])] ?? ctx.color; break;
@@ -943,8 +1011,30 @@ async function runScript(label, target) {
         }
         case 'waitmovement': await Promise.all(ctx.moves); ctx.moves = []; break;
         case 'delay': await delayFrames(value(args[0])); break;
-        case 'removeobject': { const a = actorFor(args[0], ctx); if (a && a !== player) { a.removed = true; a.root.visible = false; } break; }
+        case 'removeobject': { const a = actorFor(args[0], ctx); if (a && a !== player) { a.removed = true; a.root.visible = false; if (a.flag && a.flag !== '0') story.flags.add(a.flag); } break; }
         case 'addobject': { const a = actorFor(args[0], ctx); if (a && a !== player) { a.removed = false; a.root.visible = true; } break; }
+        case 'turnobject': { const a = actorFor(args[0], ctx); if (a) a.facing = DIR_OF[value(args[1])] ?? a.facing; break; }
+        case 'setobjectxyperm': {
+          const a = actorFor(args[0], ctx);
+          if (a && a !== player) { a.x = a.home.x = a.m.ox + value(args[1]); a.y = a.home.y = a.m.oy + value(args[2]); a.from = null; }
+          break;
+        }
+        case 'setobjectmovementtype': {
+          const a = actorFor(args[0], ctx);
+          if (a && a !== player) { a.movement = args[1]; if (MOVEMENT_FACING[args[1]]) a.facing = a.startFacing = MOVEMENT_FACING[args[1]]; }
+          break;
+        }
+        case 'waitdooranim': await delayFrames(16); break;
+        case 'warp': case 'warpsilent': {
+          const dest = maps.find((m) => m.D.id === args[0]);
+          if (!dest) { pc = body.length; stack.length = 0; break; } // somewhere not in this bake
+          if (args.length >= 3 && args[2] !== undefined && !Number.isNaN(Number(value(args[2])))) await warpTo(dest, value(args[1]), value(args[2]));
+          else { const t = dest.D.warps[value(args[1])]; if (t) await warpTo(dest, t.x, t.y, t.behavior); }
+          break;
+        }
+        case 'playbgm': music.play(args[0]); break;
+        case 'savebgm': savedBgm = args[0] === 'MUS_DUMMY' ? null : args[0]; break;
+        case 'fadedefaultbgm': music.play(savedBgm ?? currentMap?.D.music); break;
         default: break; // lock, release, special, fanfares, battles, …: not needed to read the scene yet
       }
     }
@@ -952,7 +1042,7 @@ async function runScript(label, target) {
     await Promise.all(ctx.moves);
     closeBox();
     $('yesno').hidden = true;
-    scriptRunning = false;
+    scriptDepth--; scriptRunning = scriptDepth > 0;
     takeA();
   }
 }
@@ -1046,7 +1136,7 @@ $('shade').onchange = () => {
 // Only the current area is drawn; interiors sit in black and use their camera.
 function applyAreaLook() {
   for (const m of maps) m.opaque.visible = m.cutout.visible = inArea(m);
-  for (const a of npcs) a.root.visible = a.area === area;
+  for (const a of npcs) a.root.visible = a.area === area && !a.removed && !a.invisible;
   scene.background.set(areaMaps().some((m) => m.D.indoor) ? '#000000' : '#9fd3e8');
   const p = areaMaps()[0].D.camera.preset;
   if (p !== preset) { preset = p; settings = presetSettings[p]; syncSliders(); }
@@ -1108,11 +1198,16 @@ function frame(dt) {
     a.t += dt / (BB.stepSeconds * (a.jump ? 2 : 1));
     if (a.t >= 1) {
       a.from = null; a.t = 1; a.jump = false;
-      // Stepping onto stairs takes them.
-      const w = a === player && warpAt(a.x, a.y);
-      if (w && isStairs(w.behavior)) warp(w);
+      if (a === player && !scriptRunning) {
+        // Stepping onto stairs takes them; stepping onto a trigger starts its scene.
+        const w = warpAt(a.x, a.y);
+        if (w && isStairs(w.behavior)) warp(w);
+        else { const t = triggerAt(a.x, a.y); if (t) runScript(t.script, null); }
+      }
     }
   }
+  const sceneScript = !scriptRunning && !warping && !player.from && frameScript();
+  if (sceneScript) runScript(sceneScript, null);
   if (scriptRunning) { /* the script moves people; nobody wanders */ }
   else if (!player.from && !warping && buttons.aPressed) { buttons.aPressed = buttons.bPressed = false; interact(); }
   else if (buttons.bPressed) buttons.bPressed = false;
@@ -1142,18 +1237,28 @@ renderer.setAnimationLoop((now) => {
 // Test hook: drive the game by hand (e.g. when the page is in a background tab
 // and animation frames are paused). Holds a direction for some seconds of game
 // time, then reports where the player is.
+// Yield to the page between test frames (a message-channel task: background tabs don't slow it down),
+// so scripts waiting on a frame get to continue, as they do between real animation frames.
+const yieldTask = () => new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); });
+const runFrames = async (seconds) => { for (let t = 0; t < seconds; t += 1 / 30) { frame(1 / 30); await yieldTask(); } };
 window.pokered = {
   async walk(dir, seconds) {
     held.add(dir);
-    for (let t = 0; t < seconds; t += 1 / 30) frame(1 / 30);
+    await runFrames(seconds);
     held.delete(dir);
-    for (let t = 0; t < 0.6; t += 1 / 30) frame(1 / 30); // finish the step
+    await runFrames(0.6); // finish the step
     await new Promise((r) => setTimeout(r, 450)); // let a warp's fade finish
-    for (let t = 0; t < 0.6; t += 1 / 30) frame(1 / 30);
+    await runFrames(0.6);
     return this.where();
   },
   music,
   story,
+  /** Everyone in the current area: id, cell, facing, whether shown. */
+  people() { return areaActors().map((p) => `${p.id ?? p.gfx}@${p.x - p.m.ox},${p.y - p.m.oy}${p.from ? '(moving)' : ''} ${p.facing}${p.removed ? ' removed' : ''}${p.invisible ? ' invisible' : ''}`); },
+  get scriptDepth() { return scriptDepth; },
+  get lastCommand() { return lastCommand; },
+  /** Warp straight to a cell on a map (by folder name), running its map scripts. */
+  async go(name, x, y) { await warpTo(mapByName(name), x, y); return this.tick(0.3).then(() => this.where()); },
   /** Start an event script by name, as if talking to no one in particular. */
   run(label) { runScript(label, null); return this.tick(0.1); },
   /** Press A (or B) once, then let some game time pass. */
@@ -1162,11 +1267,7 @@ window.pokered = {
     await this.tick(seconds);
     return this.text();
   },
-  async tick(seconds) {
-    for (let t = 0; t < seconds; t += 1 / 30) frame(1 / 30);
-    await new Promise((r) => setTimeout(r, 0));
-    for (let t = 0; t < 0.1; t += 1 / 30) frame(1 / 30);
-  },
+  async tick(seconds) { await runFrames(seconds); },
   /** What the text box shows right now ('' when closed). */
   text() {
     return $('textbox').hidden ? '' : `[${$('textbox').dataset.style}/${$('textbox').dataset.color}] ${$('tb1').textContent} / ${$('tb2').textContent}`;

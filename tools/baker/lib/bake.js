@@ -330,6 +330,9 @@ export function bakeMap(name, rules, lookup) {
       sprites,
       billboards: { player: B.player, lean: B.lean, matchScreenSize: B.match_screen_size, feetOffset: B.feet_offset, stepSeconds: B.step_seconds },
       signs: (map.bg_events ?? []).map((b) => ({ type: b.type, x: b.x, y: b.y, script: b.script })),
+      // Step-on triggers: run `script` when the player steps here while `var` equals `value`.
+      triggers: (map.coord_events ?? []).filter((c) => c.type === 'trigger').map((c) => ({ x: c.x, y: c.y, var: c.var, value: c.var_value, script: c.script })),
+      mapScripts: `${name}_MapScripts`,
       structures: { buildings, objects },
       atlas: { file: 'atlas.png' },
       original,

@@ -119,6 +119,7 @@ generated from the same data.
 | Animation tagging | **done** | Ranges read from `src/tileset_anims.c` |
 | Height | **done** | Cliffs on routes will need real elevation changes to test |
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
+| Scenes and triggers | **done** | Map scripts, step-on triggers, scripted walking, script warps; FireRed's opening plays |
 | Talking and signs | **done** | Decomp scripts and text; common commands; battles and menus skipped |
 | Music | **done** | Map songs from the decomp's MIDI, voicegroups and samples |
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
@@ -162,8 +163,25 @@ for things that don't exist yet (battles, the bag, fanfares, menus) are
 skipped, so those scenes play their lines and stop. `{PLAYER}` and `{RIVAL}`
 are RED and BLUE.
 
-Not yet: step triggers (Oak stopping you at the edge of town), trainer
-battles, the start menu.
+### Scenes
+
+Map scripts run as in FireRed: each map's transition script and warp-in
+table when it loads (temporary vars and flags are cleared first), its
+per-frame table whenever no script is running, and step-on triggers when
+the player finishes a step on one. People appear and disappear by their
+visibility flags (`removeobject` sets the flag; clearing it brings them back
+at their spot), scripts walk people along movement lists without collision
+checks, `warp` moves the player between maps, and `playbgm` / `savebgm` /
+`fadedefaultbgm` change the music. This plays FireRed's opening: Oak stops
+you at the edge of town, leads you to the lab, Blue complains, you choose a
+starter, Blue takes his, and he challenges you on the way out (the battle
+itself is skipped for now).
+
+The preview's `window.pokered` test hook can drive all of this: `go(map, x,
+y)`, `walk(dir, seconds)`, `press('a')`, `tick(seconds)`, `run(label)`,
+`text()`, `people()` and `lastCommand`.
+
+Not yet: trainer battles, the start menu, Pokémon pictures (`showmonpic`).
 
 ### Known gaps
 

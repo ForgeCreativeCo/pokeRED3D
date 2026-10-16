@@ -22,17 +22,27 @@ function load() {
 
   for (const file of scriptFiles) {
     let cur = null;
+    // Parameterless .macro blocks (used to share runs of movement steps) are
+    // expanded where they're used.
+    const macros = new Map();
+    let macro = null;
     for (const raw of fs.readFileSync(p(file), 'utf8').split(/\r?\n/)) {
       const line = raw.replace(/@.*$/, '').trim();
       if (!line) continue;
+      const m = line.match(/^\.macro\s+(\w+)\s*$/);
+      if (m) { macro = []; macros.set(m[1], macro); continue; }
+      if (line === '.endm') { macro = null; continue; }
       const eq = line.match(/^\.(?:equ|set)\s+(\w+)\s*,\s*(\w+)/);
       if (eq) { consts[eq[1]] = eq[2]; continue; }
       const label = line.match(/^(\w+)::?$/);
-      if (label) { cur = []; scripts.set(label[1], cur); continue; }
-      if (!cur || line.startsWith('.')) continue;
+      if (label && !macro) { cur = []; scripts.set(label[1], cur); continue; }
+      if (line.startsWith('.')) continue;
       const [cmd, ...rest] = line.split(/\s+/);
       const args = rest.join(' ').split(',').map((s) => s.trim()).filter(Boolean);
-      cur.push([cmd, ...args]);
+      if (macro) { macro.push([cmd, ...args]); continue; }
+      if (!cur) continue;
+      if (macros.has(cmd) && !args.length) cur.push(...macros.get(cmd));
+      else cur.push([cmd, ...args]);
     }
   }
   for (const file of textFiles) {
@@ -50,7 +60,7 @@ function load() {
   for (const f of ['include/constants/global.h', 'include/constants/vars.h']) {
     for (const [, name, value] of fs.readFileSync(p(f), 'utf8').matchAll(/#define\s+((?:DIR|NPC_TEXT_COLOR)_\w+|MALE|FEMALE)\s+(\d+)/g)) consts[name] = value;
   }
-  Object.assign(consts, { TRUE: '1', FALSE: '0' });
+  Object.assign(consts, { TRUE: '1', FALSE: '0', YES: '1', NO: '0' });
 
   // Default text colour per sprite: entries pair a graphics id with the next one.
   const textColors = {};
@@ -84,6 +94,6 @@ export function bakeScripts(roots) {
       }
   }
   // Constants can alias variables (SIGN_LADY_READY -> VAR_TEMP_2); keep the DIR/colour ones too.
-  for (const [k, v] of Object.entries(consts)) if (/^(DIR|NPC_TEXT_COLOR)_|^(TRUE|FALSE|MALE|FEMALE)$/.test(k)) out.consts[k] = v;
+  for (const [k, v] of Object.entries(consts)) if (/^(DIR|NPC_TEXT_COLOR)_|^(TRUE|FALSE|YES|NO|MALE|FEMALE)$/.test(k)) out.consts[k] = v;
   return out;
 }
