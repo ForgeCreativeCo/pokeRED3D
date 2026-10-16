@@ -50,6 +50,8 @@ export interface MapMeshes {
   cutout: THREE.Mesh;
   /** lit (Lambert) and flat (unlit) materials: [opaque, cutout] */
   materials: { lit: [THREE.Material, THREE.Material]; flat: [THREE.Material, THREE.Material] };
+  /** for the people billboards, whose frames are in this map's atlas */
+  sprite: THREE.Material;
 }
 
 export function buildMapMeshes(m: LoadedMap): MapMeshes {
@@ -59,8 +61,10 @@ export function buildMapMeshes(m: LoadedMap): MapMeshes {
     lit: [new THREE.MeshLambertMaterial({ map: texture, side }), new THREE.MeshLambertMaterial({ map: texture, side, alphaTest: 0.5 })],
     flat: [new THREE.MeshBasicMaterial({ map: texture, side }), new THREE.MeshBasicMaterial({ map: texture, side, alphaTest: 0.5 })],
   };
+  const sprite = new THREE.MeshBasicMaterial({ map: texture, alphaTest: 0.5, side });
   return {
     texture,
+    sprite,
     opaque: new THREE.Mesh(geometry(m.data.quads.filter((q) => !q.a), m), materials.lit[0]),
     cutout: new THREE.Mesh(geometry(m.data.quads.filter((q) => q.a), m), materials.lit[1]),
     materials,

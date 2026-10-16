@@ -1,19 +1,19 @@
 // Plays the game from a script of test-hook calls and records what happens.
 //
-// The page runs with a seeded Math.random and with requestAnimationFrame
-// switched off, so only the test hook advances the game and every run of the
-// same steps produces the same transcript.
+// The page runs seeded (?seed=, and a seeded Math.random for the old preview)
+// and with requestAnimationFrame switched off, so only the test hook advances
+// the game and every run of the same steps produces the same transcript.
 //
 // Usage: node tests/playthrough/driver.mjs <steps.json> [url]
 //   steps.json: [["step", "up", 3], ["press", "a"], ["advance"], ...]
 //     step and advance are the driver's own (see below); anything else is
 //     a call to pokered.<method>(...args).
-//   url defaults to the preview served by `npm run serve`.
+//   url defaults to the game served by `npm run dev`.
 
 import fs from 'node:fs';
 import { chromium } from '@playwright/test';
 
-export const DEFAULT_URL = 'http://localhost:5179/debug/view3d.html';
+export const DEFAULT_URL = 'http://localhost:5173/';
 
 // Runs in the page before any of its scripts.
 function deterministic(seed) {
@@ -37,7 +37,7 @@ export async function play(steps, { url = DEFAULT_URL, seed = 1 } = {}) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.addInitScript(deterministic, seed);
-    await page.goto(url);
+    await page.goto(`${url}${url.includes('?') ? '&' : '?'}seed=${seed}`);
     await page.waitForFunction(() => window.pokered, null, { timeout: 60000 });
     const snapshot = () => page.evaluate(() => ({
       where: pokered.where(),

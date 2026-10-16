@@ -70,6 +70,10 @@ Other commands:
 | `npm run classify -- <Map> …` | Classify a map's tiles and write debug overlays to `build/debug/` |
 | `npm run bake -- <Map> …` | Bake maps (plus their songs and scripts) and write the preview to `build/debug/view3d.html` |
 | `npm run serve` | Serve `build/` on localhost (bakes with several maps are too big to open from disk) |
+| `npm run dev` | Run the game (TypeScript source in `src/`) on http://localhost:5173 with the baked data |
+| `npm run build` | Typecheck and build the game into `dist/` |
+| `npm test` | Unit tests (Vitest) |
+| `npm run playthrough -- opening --check` | Play the opening against the running game and compare it with its golden transcript |
 
 Map names are folder names under `vendor/pokefirered/data/maps`. The first map
 in a bake is the origin; connected maps join it, and interiors become their
