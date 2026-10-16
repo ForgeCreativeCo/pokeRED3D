@@ -3,7 +3,7 @@
 //   dev     the Vite dev server (the default)
 //   dist    the production build in dist/ (run `npm run build` first)
 //   single  the single-file page dist-single/index.html, from disk (`npm run build:single`)
-//   http…   a game that's already running
+//   http…   a game that's already running (or file:// a page on disk)
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +14,7 @@ const ROOT = path.resolve(import.meta.dirname, '../..');
 
 /** Start the target; resolves { url, close }. */
 export async function serve(target = 'dev') {
-  if (/^https?:/.test(target)) return { url: target, close: async () => {} };
+  if (/^(https?|file):/.test(target)) return { url: target, close: async () => {} };
   const quiet = { root: ROOT, logLevel: 'silent' };
   if (target === 'dev') {
     const server = await createServer({ ...quiet, server: { port: 0, strictPort: false } });

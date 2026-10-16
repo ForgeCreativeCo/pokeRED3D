@@ -11,7 +11,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build:single": "tsc --noEmit && vite build --mode single"
+    "build:single": "tsc --noEmit && vite build --mode single",
+    "build:artifact": "npm run build:single && node tools/artifact.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

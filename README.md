@@ -72,6 +72,7 @@ Other commands:
 | `npm run dev` | Run the game on http://localhost:5173, live-reloading as `src/` changes |
 | `npm run build` | Typecheck and build the game into `dist/`, with the baked data alongside |
 | `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
+| `npm run build:artifact` | The single-file page shaped for publishing as a claude.ai Artifact: `dist-single/pokered3d.html` |
 | `npm test` | Unit tests |
 | `npm run playthrough -- opening --check [dev|dist|single]` | Play the opening in a build and compare it with its golden transcript |
 

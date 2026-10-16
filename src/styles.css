@@ -25,6 +25,8 @@
 [hidden] { display: none !important; }
 html, body { height: 100%; overflow: hidden; }
 body { background: var(--sky); color: var(--ink); font: 14px/1.4 var(--font-ui); }
+/* Everything on screen is fixed and clears the safe-area insets itself; the gutter is for the page host. */
+body { margin: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
 
 #panel {
