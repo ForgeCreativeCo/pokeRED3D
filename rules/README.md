@@ -108,8 +108,9 @@ player in the walk-behind row just like on the GBA.
 - `uv` is a pixel rect in the atlas with v growing downward. `a: 1` means alpha-tested (cutout).
 - `k` is `ground`, `water`, `step`, `wall`, `roof`, `side`, or an object class.
 
-Quads in JSON keep the format engine-neutral. A glTF export for Godot can be
-generated from the same data.
+Quads in JSON keep the format engine-neutral: the game reads them with
+three.js today, and a glTF export could be generated from the same data if
+another renderer ever needs it.
 
 ## Planned rule sets
 
