@@ -92,14 +92,47 @@ export function layerCoverage(pair, metatile) {
   });
 }
 
-export function renderMetatile(pair, id) {
+/**
+ * Render a metatile to 16x16. `layers` picks which of its two layers to draw;
+ * without the backdrop, undrawn pixels stay transparent.
+ */
+export function renderMetatile(pair, id, { layers = [0, 1], backdrop = true } = {}) {
   const img = new Image(16, 16);
   const mt = metatileFor(pair, id);
   if (!mt) return img;
-  img.fill(0, 0, 16, 16, paletteColor(pair, 0, 0)); // backdrop colour
-  drawMetatileLayer(img, pair, mt, 0, 0, 0);
-  drawMetatileLayer(img, pair, mt, 1, 0, 0);
+  if (backdrop) img.fill(0, 0, 16, 16, paletteColor(pair, 0, 0));
+  for (const layer of layers) drawMetatileLayer(img, pair, mt, layer, 0, 0);
   return img;
+}
+
+/** Packs images into one atlas, left to right in shelves. */
+export class AtlasPacker {
+  constructor(width, gap = 2) {
+    this.width = width;
+    this.gap = gap;
+    this.items = [];
+    this.x = 0;
+    this.y = 0;
+    this.shelf = 0;
+  }
+  /** Add an image; returns its pixel rect [u0, v0, u1, v1]. */
+  add(img) {
+    if (this.x + img.width > this.width) {
+      this.x = 0;
+      this.y += this.shelf + this.gap;
+      this.shelf = 0;
+    }
+    const rect = [this.x, this.y, this.x + img.width, this.y + img.height];
+    this.items.push({ img, x: this.x, y: this.y });
+    this.x += img.width + this.gap;
+    this.shelf = Math.max(this.shelf, img.height);
+    return rect;
+  }
+  build() {
+    const out = new Image(this.width, this.y + this.shelf);
+    for (const { img, x, y } of this.items) out.blit(img, x, y);
+    return out;
+  }
 }
 
 export function renderLayout(layout, pair) {

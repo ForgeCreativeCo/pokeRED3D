@@ -29,10 +29,25 @@ export function loadRules() {
     if (a.when) checkClass(a.when, `animations.yaml ${name}`);
   }
 
+  const height = readYaml(path.join(RULES_DIR, 'height.yaml'));
+  const standup = readYaml(path.join(RULES_DIR, 'standup.yaml'));
+  const { cameras } = readYaml(path.join(RULES_DIR, 'camera.yaml'));
+  for (const cls of standup.buildings.classes) checkClass(cls, 'standup.yaml buildings');
+  for (const cls of Object.keys(standup.objects)) checkClass(cls, 'standup.yaml objects');
+  if (!cameras.default) throw new Error('camera.yaml: needs a `default` camera');
+
   return {
     classes,
     animations,
     classifier,
+    height,
+    standup,
+    cameras,
+    /** rules/maps/<name>.yaml, or {} */
+    map(name) {
+      const file = path.join(RULES_DIR, 'maps', `${name}.yaml`);
+      return fs.existsSync(file) ? readYaml(file) : {};
+    },
     checkClass,
     /** Rule for a behavior name, or undefined. */
     behavior(name) {

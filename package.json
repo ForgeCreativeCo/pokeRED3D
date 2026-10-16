@@ -5,7 +5,8 @@
   "scripts": {
     "setup:decomp": "git clone --depth 1 https://github.com/pret/pokefirered.git vendor/pokefirered",
     "classify": "node tools/baker/classify.js",
-    "render": "node tools/baker/render.js"
+    "render": "node tools/baker/render.js",
+    "bake": "node tools/baker/bake.js"
   },
   "devDependencies": {
     "pngjs": "^7.0.0",

@@ -1,0 +1,47 @@
+# Stand-up rule: which cells rise out of the ground plane, and how.
+#
+# Footprint principle: a 3D object covers exactly the cells the GBA collision
+# grid blocks for it, plus the walk-behind "overhang" row above it (drawn as
+# geometry over the walkable cell, with no collision). That keeps visuals and
+# gameplay in step: no invisible walls, and the roof hides the player in the
+# overhang row just like on the GBA.
+
+# Buildings: connected regions of wall / door / roof cells (and roof overhangs).
+# Each column stands its bottom run of wall cells up as a vertical face at the
+# front edge, then lays its roof cells as a slope from the wall top back over
+# the rest of the footprint.
+buildings:
+  classes: [wall, door, roof]
+  wall_height_per_row: 1.0   # tiles of wall height per wall row in the art
+  roof_rise: 0.6             # extra height at the back edge of the roof
+  min_wall_rows: 1           # columns with no wall rows still get this much wall
+  sides: true                # close off the left / right ends
+
+# Objects: everything else that stands up. Cells of these classes are grouped
+# into vertical stacks per column (including any overhang cell on top), cut
+# into chunks of at most `max_rows` from the bottom, and each chunk stands as
+# an upright quad on the front edge of its bottom cell.
+#
+#   max_rows        chunk size; FireRed trees are 2 rows tall
+#   height_per_row  tiles of height per row of art (default 1)
+#   lean            degrees tipped back from vertical
+#   ground          what the flat ground under it shows: nearest (the nearest
+#                   plain ground tile) or shade (the same, darkened)
+objects:
+  tree: { max_rows: 2, height_per_row: 1.25, lean: 20, ground: shade }
+  prop: { max_rows: 2 }
+  sign: { max_rows: 2 }
+  ledge: { max_rows: 1, height_per_row: 0.5 }
+  furniture: { max_rows: 2 }
+
+# Cutting objects out of their background. A standing quad starts as the full
+# metatile art; any pixel identical to the same pixel of the nearest plain
+# ground metatile is the grass or path painted behind the object, and becomes
+# transparent. Objects backed by other objects (a forest) stay solid.
+# Overhang cells (walk-behind tree tops, roof edges) only stand up their
+# second layer, since their first layer is the ground the player walks on.
+object_cutout: background
+
+# Ground under objects and buildings: the flat art there still has the object
+# painted in it, so it's replaced (see `ground` above; default nearest).
+shade_amount: 0.45   # how much `shade` darkens

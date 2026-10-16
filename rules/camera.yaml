@@ -1,0 +1,10 @@
+# Camera presets. A map uses `default` unless rules/maps/<Map>.yaml picks one.
+#
+#   pitch     degrees down from horizontal (90 = straight down)
+#   fov       vertical field of view in degrees (low = flatter, closer to the GBA)
+#   distance  tiles from the player to the camera
+#   view      tiles of map visible vertically (overrides distance when set)
+
+cameras:
+  default:  { pitch: 55, fov: 24, view: 11 }
+  interior: { pitch: 62, fov: 22, view: 10 }

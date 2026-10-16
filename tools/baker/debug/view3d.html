@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Preview</title>
+<style>
+  :root { --panel: #ffffffe6; --fg: #1d1d1b; --muted: #6b6b66; --line: #ddddd8; }
+  @media (prefers-color-scheme: dark) { :root { --panel: #22221fe6; --fg: #ececea; --muted: #9a9a94; --line: #34342f; } }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font: 13px/1.4 system-ui, sans-serif; }
+  #ui { position: fixed; top: 10px; left: 10px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; max-width: calc(100vw - 44px); }
+  #ui b { font-size: 14px; }
+  #ui label { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+  #ui output { font-variant-numeric: tabular-nums; color: var(--fg); min-width: 2.5em; }
+  #ui small { color: var(--muted); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="ui">
+  <b id="title"></b>
+  <label><input type="checkbox" id="orbit"> free orbit camera</label>
+  <label><input type="checkbox" id="shade" checked> shading</label>
+  <label>pitch <input type="range" id="pitch" min="25" max="90"> <output id="pitchOut"></output></label>
+  <label>fov <input type="range" id="fov" min="10" max="60"> <output id="fovOut"></output></label>
+  <label>view <input type="range" id="view" min="6" max="30"> <output id="viewOut"></output></label>
+  <small>WASD / arrows to walk · cell <span id="pos"></span></small>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+/*DATA*/
+
+const $ = (id) => document.getElementById(id);
+$('title').textContent = `${MAP.name} — ${MAP.quads.length} quads`;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.append(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#9fd3e8');
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a9a7a', 1.6));
+const sun = new THREE.DirectionalLight('#fff4e0', 1.6);
+sun.position.set(-6, 14, 8);
+scene.add(sun);
+
+// ---- map geometry from baked quads ----
+const tex = await new THREE.TextureLoader().loadAsync(ATLAS);
+tex.magFilter = tex.minFilter = THREE.NearestFilter;
+tex.generateMipmaps = false;
+tex.flipY = false;
+tex.colorSpace = THREE.SRGBColorSpace;
+const AW = tex.image.width, AH = tex.image.height;
+
+function build(filter) {
+  const pos = [], uv = [];
+  for (const q of MAP.quads) {
+    if (!filter(q)) continue;
+    const p = q.p, [u0, v0, u1, v1] = q.uv;
+    const corners = [[0, u0, v1], [1, u1, v1], [2, u1, v0], [3, u0, v0]];
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      const [c, u, v] = corners[i];
+      pos.push(p[c * 3], p[c * 3 + 1], p[c * 3 + 2]);
+      uv.push(u / AW, v / AH);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return g;
+}
+const mats = {
+  lit: [new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
+  flat: [new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
+};
+const opaque = new THREE.Mesh(build((q) => !q.a), mats.lit[0]);
+const cutout = new THREE.Mesh(build((q) => q.a), mats.lit[1]);
+scene.add(opaque, cutout);
+
+// ---- player and NPC markers ----
+const W = MAP.width, H = MAP.height, G = MAP.grid;
+const at = (x, y) => y * W + x;
+const marker = (colour) => {
+  const m = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.9, 16), new THREE.MeshLambertMaterial({ color: colour }));
+  body.position.y = 0.45;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshLambertMaterial({ color: '#f5d0a8' }));
+  head.position.y = 1.05;
+  m.add(body, head);
+  return m;
+};
+for (const o of MAP.objects) {
+  const m = marker('#6d7a8c');
+  m.position.set(o.x + 0.5, G.height[at(o.x, o.y)] ?? 0, o.y + 0.5);
+  scene.add(m);
+}
+const player = marker('#d6342c');
+scene.add(player);
+const start = MAP.warps[0] ? { x: MAP.warps[0].x, y: MAP.warps[0].y + 1 } : { x: W >> 1, y: H >> 1 };
+const P = { x: start.x, y: start.y, from: null, t: 1 };
+const place = () => {
+  const k = P.from ? Math.min(P.t, 1) : 1;
+  const fx = P.from ? P.from.x : P.x, fy = P.from ? P.from.y : P.y;
+  const x = fx + (P.x - fx) * k, y = fy + (P.y - fy) * k;
+  const h = G.height[at(P.x, P.y)];
+  player.position.set(x + 0.5, h, y + 0.5);
+  $('pos').textContent = `${P.x},${P.y}`;
+};
+
+const keys = new Set();
+addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
+addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+const moves = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
+function tryMove() {
+  for (const [k, [dx, dy]] of Object.entries(moves)) {
+    if (!keys.has(k)) continue;
+    const nx = P.x + dx, ny = P.y + dy;
+    if (nx < 0 || ny < 0 || nx >= W || ny >= H || !G.walkable[at(nx, ny)]) return;
+    P.from = { x: P.x, y: P.y };
+    P.x = nx; P.y = ny; P.t = 0;
+    return;
+  }
+}
+
+// ---- camera ----
+const cam = new THREE.PerspectiveCamera(MAP.camera.fov, innerWidth / innerHeight, 0.1, 500);
+const orbit = new OrbitControls(cam, renderer.domElement);
+orbit.enabled = false;
+const settings = { pitch: MAP.camera.pitch, fov: MAP.camera.fov, view: MAP.camera.view };
+for (const k of ['pitch', 'fov', 'view']) {
+  $(k).value = settings[k];
+  $(k + 'Out').textContent = settings[k];
+  $(k).oninput = () => { settings[k] = +$(k).value; $(k + 'Out').textContent = settings[k]; };
+}
+$('orbit').onchange = () => {
+  orbit.enabled = $('orbit').checked;
+  if (orbit.enabled) { orbit.target.copy(player.position); orbit.update(); }
+};
+$('shade').onchange = () => {
+  const m = $('shade').checked ? mats.lit : mats.flat;
+  opaque.material = m[0]; cutout.material = m[1];
+};
+function followCamera() {
+  cam.fov = settings.fov;
+  const d = settings.view / 2 / Math.tan((settings.fov * Math.PI) / 360);
+  const p = (settings.pitch * Math.PI) / 180;
+  const t = player.position.clone().add(new THREE.Vector3(0, 0.5, 0));
+  cam.position.set(t.x, t.y + d * Math.sin(p), t.z + d * Math.cos(p));
+  cam.lookAt(t);
+  cam.updateProjectionMatrix();
+}
+
+addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  cam.aspect = innerWidth / innerHeight;
+  cam.updateProjectionMatrix();
+});
+
+let last = performance.now();
+renderer.setAnimationLoop((now) => {
+  const dt = (now - last) / 1000; last = now;
+  if (P.t < 1) P.t += dt / 0.25; else { P.from = null; tryMove(); }
+  place();
+  if (orbit.enabled) orbit.update(); else followCamera();
+  renderer.render(scene, cam);
+});
+</script>
+</body>
+</html>

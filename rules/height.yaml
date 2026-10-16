@@ -1,0 +1,22 @@
+# Height rule: turns map elevation into world height (in tiles).
+#
+# FireRed's elevation is a collision layer, not terrain height: outdoor ground
+# is usually 3, water 1, and blocked cells 0 ("any level"). So heights are
+# looked up per elevation, and cells without a meaningful elevation inherit
+# from the nearest walkable ground.
+
+# Elevation value -> height. Elevations not listed use
+# (elevation - ground_elevation) * step.
+ground_elevation: 3
+step: 1.0
+elevations:
+  1: -0.25   # water surface sits a little below the bank
+  2: -0.25
+
+# These elevations carry no height of their own (0 = any level, 15 = bridges
+# / multi-level); the cell takes the height of the nearest walkable cell.
+inherit: [0, 15]
+
+# Where neighbouring cells differ in height, a vertical face fills the gap.
+# Its texture is the higher cell's bottom edge, stretched down.
+step_faces: true
