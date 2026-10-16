@@ -1,7 +1,10 @@
 // Records a play-through as a golden transcript, or checks one against it.
 //
-//   node tests/playthrough/record.mjs opening           write golden/opening.json
-//   node tests/playthrough/record.mjs opening --check   play again and compare
+//   npm run playthrough -- opening                    write golden/opening.json
+//   npm run playthrough -- opening --check            play again and compare
+//   npm run playthrough -- opening --check single     ... against another build
+//
+// The build to play is dev (default), dist, single or a URL (see serve.mjs).
 //
 // The game's text is FireRed's, so the committed golden keeps only a hash of
 // each text box. A readable copy goes to build/playthrough/<name>.txt.
@@ -9,19 +12,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { play, DEFAULT_URL } from './driver.mjs';
+import { play } from './driver.mjs';
+import { serve } from './serve.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const [name, ...flags] = process.argv.slice(2);
 const check = flags.includes('--check');
-const url = flags.find((f) => f.startsWith('http')) ?? DEFAULT_URL;
+const target = flags.find((f) => !f.startsWith('--')) ?? 'dev';
 if (!name) {
-  console.error('Usage: node tests/playthrough/record.mjs <name> [--check] [url]');
+  console.error('Usage: npm run playthrough -- <name> [--check] [dev|dist|single|url]');
   process.exit(1);
 }
 
 const steps = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, `${name}.json`), 'utf8'));
-const transcript = await play(steps, { url });
+const server = await serve(target);
+let transcript;
+try {
+  transcript = await play(steps, { url: server.url });
+} finally {
+  await server.close();
+}
 
 const hash = (s) => (s ? crypto.createHash('sha256').update(s).digest('hex').slice(0, 12) : '');
 const scrub = (t) => ({ ...t, text: hash(t.text), ...(t.said && { said: t.said.map(hash) }) });
@@ -49,5 +59,5 @@ if (!check) {
     console.error(`${name}: ${diffs.length} step(s) differ (readable run in build/playthrough/${name}.txt)\n${diffs.slice(0, 3).join('\n')}`);
     process.exit(1);
   }
-  console.log(`${name}: matches the golden transcript (${golden.length} steps)`);
+  console.log(`${name}: ${target} matches the golden transcript (${golden.length} steps)`);
 }

@@ -2,15 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "preview",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "serve"
-      ],
-      "port": 5179
-    },
-    {
       "name": "game",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

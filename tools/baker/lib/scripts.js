@@ -1,4 +1,4 @@
-// Event scripts and text from the decomp, for the preview's script player.
+// Event scripts and text from the decomp, for the game's script player.
 //
 // Scripts live in data/maps/*/scripts.inc, data/scripts/*.inc and
 // data/event_scripts.s as labelled lists of commands; text lives in

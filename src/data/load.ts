@@ -1,6 +1,8 @@
 // Loads the baked data: the world layout, every map in it with its atlas,
-// the scripts and the music.
+// the scripts and the music. They're fetched from build/, or come embedded
+// in the page in the single-file build.
 
+import embedded from 'virtual:baked-data';
 import type { MapFile, MusicFile, ScriptsFile, WorldFile } from './types';
 
 export interface LoadedMap {
@@ -35,6 +37,14 @@ function image(url: string): Promise<HTMLImageElement> {
 }
 
 export async function loadGame(base = import.meta.env.BASE_URL): Promise<GameData> {
+  const e = embedded;
+  if (e) {
+    const { world, scripts, music } = e;
+    const maps = await Promise.all(world.maps.map(async ({ map, area, ox, oy }) => (
+      { data: e.maps[map].data, area, ox, oy, atlas: await image(e.maps[map].atlas) }
+    )));
+    return { world, maps, scripts, music };
+  }
   const [world, scripts, music] = await Promise.all([
     json<WorldFile>(`${base}data/world.json`),
     json<ScriptsFile>(`${base}data/scripts.json`),

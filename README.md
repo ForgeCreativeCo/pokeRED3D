@@ -56,7 +56,7 @@ You need Node.js and git.
 npm install
 npm run setup:decomp     # once: clones pret/pokefirered into vendor/
 npm run bake -- PalletTown Route1 Route21_North ViridianCity PalletTown_PlayersHouse_1F PalletTown_PlayersHouse_2F PalletTown_RivalsHouse PalletTown_ProfessorOaksLab
-npm run serve            # then open http://localhost:5179
+npm run dev              # then open http://localhost:5173
 ```
 
 **Controls:** WASD or the arrow keys to walk; Z, Enter or Space for A (talk,
@@ -68,12 +68,12 @@ Other commands:
 | Command | What it does |
 |---|---|
 | `npm run classify -- <Map> …` | Classify a map's tiles and write debug overlays to `build/debug/` |
-| `npm run bake -- <Map> …` | Bake maps (plus their songs and scripts) and write the preview to `build/debug/view3d.html` |
-| `npm run serve` | Serve `build/` on localhost (bakes with several maps are too big to open from disk) |
-| `npm run dev` | Run the game (TypeScript source in `src/`) on http://localhost:5173 with the baked data |
-| `npm run build` | Typecheck and build the game into `dist/` |
-| `npm test` | Unit tests (Vitest) |
-| `npm run playthrough -- opening --check` | Play the opening against the running game and compare it with its golden transcript |
+| `npm run bake -- <Map> …` | Bake maps (plus their songs and scripts) into `build/` for the game to load |
+| `npm run dev` | Run the game on http://localhost:5173, live-reloading as `src/` changes |
+| `npm run build` | Typecheck and build the game into `dist/`, with the baked data alongside |
+| `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
+| `npm test` | Unit tests |
+| `npm run playthrough -- opening --check [dev|dist|single]` | Play the opening in a build and compare it with its golden transcript |
 
 Map names are folder names under `vendor/pokefirered/data/maps`. The first map
 in a bake is the origin; connected maps join it, and interiors become their
@@ -94,6 +94,25 @@ The rules, the baked format and every decision behind them are documented in
 | **Music** | Each song's MIDI, voicegroup and samples, resolved to the voices FireRed would play | `tools/baker/lib/music.js` |
 | **Scripts** | Event scripts and text reachable from people, signs, triggers and map scripts | `tools/baker/lib/scripts.js` |
 
+The game itself is TypeScript and three.js in `src/`, built with Vite. It
+loads the baked files (`build/data/*.json` and each map's `map.json` and
+`atlas.png`) and plays them:
+
+| Module | What it does |
+|---|---|
+| `data/` | Types for every baked file, and the loader |
+| `world/` | The loaded maps as one grid: areas, cells, walkability, warps, triggers |
+| `characters/` | People: stepping, ledge hops, wandering, and their sprite billboards |
+| `scripts/` | Story flags and variables, and the player for the decomp's event and map scripts |
+| `ui/` | The text box and YES/NO, emotes, the tuning panel |
+| `audio/` | The synth that plays FireRed's songs |
+| `input/` | Keyboard, d-pad and A button |
+| `render/` | The scene, the follow camera, and the GBA view for compare mode |
+| `game.ts` | Wires it together and runs the frame |
+
+World, character and script logic don't touch three.js or the page, so they
+run under unit tests.
+
 **The footprint principle** keeps it playable: anything raised in 3D covers
 exactly the cells FireRed blocks for it, plus its walk-behind row. Visuals and
 gameplay can't disagree, so there are no invisible walls, and roofs and tree
@@ -109,16 +128,24 @@ tools/
     classify.js        npm run classify
     bake.js            npm run bake
     lib/               decomp readers, classifier, baker, sprites, music, scripts
-    debug/             the preview page and the classification viewer
-  serve.js             npm run serve
+    debug/             the classification viewer
+src/                   the game (TypeScript, three.js), see "How it works"
+index.html             the game's page
+tests/
+  unit/                unit tests on small hand-made maps
+  playthrough/         scripted play-throughs and their golden transcripts
 vendor/pokefirered/    the decomp (cloned, gitignored)
 build/                 everything derived from it (gitignored)
+dist/, dist-single/    game builds (gitignored)
 ```
 
 ## Testing
 
-The preview exposes a test hook, `window.pokered`, that drives the game from a
-script. Every feature so far was checked by playing it through this hook:
+`npm test` runs the unit tests: the world grid, people and wandering, the
+game clock, and the script player, on small hand-made maps, so they need no
+decomp.
+
+The game exposes a test hook, `window.pokered`, that drives it from a script:
 
 ```js
 await pokered.go('PalletTown', 12, 3);  // warp somewhere
@@ -129,7 +156,24 @@ pokered.where();                        // map, cell and facing
 pokered.people();                       // everyone in the area
 ```
 
-Automated play-throughs built on it are part of the next step.
+**Play-throughs** use it to play a scene end to end in a real browser
+(Playwright with your installed Chrome) and compare every step with a golden
+transcript: where the player is, what the text box says, who is where, and
+the story's flags and variables. `tests/playthrough/opening.json` plays the
+opening from the bedroom to Blue's challenge.
+
+```bash
+npm run playthrough -- opening --check          # against the dev server
+npm run playthrough -- opening --check single   # against the single-file build
+npm run playthrough -- opening                  # re-record the golden
+```
+
+Runs are reproducible: the page is opened with `?seed=1` (people wander by
+the game's own seeded random numbers) and animation frames switched off, so
+only the hook advances the game. The golden keeps a hash of each text box,
+not FireRed's text; a readable copy of the last run goes to
+`build/playthrough/`. The play-throughs need the decomp and a bake, so they
+run locally.
 
 ## Roadmap
 
@@ -141,7 +185,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Rules and baker** | Tile classification, height, stand-up, billboards, interiors, map connections |
 | ✓ | **Overworld** | Walking, ledges, tall grass, warps, compare mode, music |
 | ✓ | **Talking and scenes** | Text box, script player, map scripts, step-on triggers, the opening sequence |
-| 2 | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
+| ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | 3 | **Start menu and saving** | Pokédex, Pokémon, Bag, player card and Save; a working Bag; save and load |
 | 4 | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; party screen and summaries |
 | 5 | **Battles** | a. battle scene and UI · b. core mechanics ported from the decomp (damage, types, accuracy, status, experience) · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |

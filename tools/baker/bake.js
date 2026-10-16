@@ -2,8 +2,9 @@
 //   build/maps/<Map>/map.json   logic grid, entities, textured quads
 //   build/maps/<Map>/atlas.png  texture atlas for the quads
 //   build/data/*.json           world layout and start, scripts, music (the game loads these)
-//   build/debug/view3d.html     3D preview of every map baked, joined by their
-//                               connections, with the first map at the origin
+//
+// The first map is at the origin; connected maps join it, and interiors
+// become their own areas.
 //
 // Usage: npm run bake -- PalletTown [Route1 ...]
 
@@ -53,7 +54,7 @@ for (const name of names) {
   for (const q of data.quads) kinds[q.k] = (kinds[q.k] ?? 0) + 1;
   console.log(`${name}: ${data.width}x${data.height}, ${data.structures.buildings.length} buildings, ${data.structures.objects.length} objects, atlas ${atlas.width}x${atlas.height}`);
   console.log(`  quads ${JSON.stringify(kinds)}`);
-  baked.set(name, { data, atlas: 'data:image/png;base64,' + atlasPng.toString('base64') });
+  baked.set(name, { data });
 }
 
 // Group the maps into areas and lay each area out in its own space by walking
@@ -86,7 +87,7 @@ for (const first of names) {
     }
   }
 }
-const world = [...placed].map(([name, { x, y, area }]) => ({ area, ox: x, oy: y, data: baked.get(name).data, atlas: baked.get(name).atlas }));
+const world = [...placed].map(([name, { x, y, area }]) => ({ area, ox: x, oy: y, data: baked.get(name).data }));
 // Start where a new game does, if that map is in the bake; otherwise outside
 // the first map's first door.
 const ng = newGame().start;
@@ -122,11 +123,3 @@ fs.writeFileSync(path.join(DATA, 'world.json'), JSON.stringify({ format: { name:
 fs.writeFileSync(path.join(DATA, 'scripts.json'), JSON.stringify(scripts));
 fs.writeFileSync(path.join(DATA, 'music.json'), JSON.stringify(music));
 console.log(`\nGame data: build/data/ (world, scripts, music)`);
-
-// The preview inlines everything so it opens straight from disk.
-const html = fs.readFileSync(path.join(import.meta.dirname, 'debug/view3d.html'), 'utf8')
-  .replace('/*DATA*/', `const WORLD = ${JSON.stringify(world)};\nconst START = ${JSON.stringify(start)};\nconst MUSIC = ${JSON.stringify(music)};
-const SCRIPTS = ${JSON.stringify(scripts)};`);
-fs.mkdirSync(path.join(OUT, 'debug'), { recursive: true });
-fs.writeFileSync(path.join(OUT, 'debug/view3d.html'), html);
-console.log(`\nPreview: build/debug/view3d.html`);

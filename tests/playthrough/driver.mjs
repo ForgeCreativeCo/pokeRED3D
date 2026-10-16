@@ -1,44 +1,31 @@
 // Plays the game from a script of test-hook calls and records what happens.
 //
-// The page runs seeded (?seed=, and a seeded Math.random for the old preview)
-// and with requestAnimationFrame switched off, so only the test hook advances
-// the game and every run of the same steps produces the same transcript.
+// The page runs seeded (?seed=) and with requestAnimationFrame switched off,
+// so only the test hook advances the game and every run of the same steps
+// produces the same transcript.
 //
-// Usage: node tests/playthrough/driver.mjs <steps.json> [url]
+// Usage: node tests/playthrough/driver.mjs <steps.json> [dev|dist|single|url]
+//   prints the transcript, for writing steps by hand.
 //   steps.json: [["step", "up", 3], ["press", "a"], ["advance"], ...]
 //     step and advance are the driver's own (see below); anything else is
 //     a call to pokered.<method>(...args).
-//   url defaults to the game served by `npm run dev`.
 
 import fs from 'node:fs';
 import { chromium } from '@playwright/test';
+import { serve } from './serve.mjs';
 
-export const DEFAULT_URL = 'http://localhost:5173/';
-
-// Runs in the page before any of its scripts.
-function deterministic(seed) {
-  let s = seed >>> 0;
-  Math.random = () => {
-    // mulberry32
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  window.requestAnimationFrame = () => 0;
-}
-
-/** Open the game, run each step, and return one transcript entry per step. */
-export async function play(steps, { url = DEFAULT_URL, seed = 1 } = {}) {
+/** Open the game at url, run each step, and return one transcript entry per step. */
+export async function play(steps, { url, seed = 1 }) {
   const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.addInitScript(deterministic, seed);
+    // Only the test hook advances the game.
+    await page.addInitScript(() => { window.requestAnimationFrame = () => 0; });
     await page.goto(`${url}${url.includes('?') ? '&' : '?'}seed=${seed}`);
-    await page.waitForFunction(() => window.pokered, null, { timeout: 60000 });
+    // Poll on a timer: the default polls on animation frames, which are off.
+    await page.waitForFunction(() => window.pokered, null, { timeout: 60000, polling: 100 });
     const snapshot = () => page.evaluate(() => ({
       where: pokered.where(),
       text: pokered.text(),
@@ -114,9 +101,10 @@ export async function play(steps, { url = DEFAULT_URL, seed = 1 } = {}) {
 }
 
 if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}` || process.argv[1]?.endsWith('driver.mjs')) {
-  const [stepsFile, url] = process.argv.slice(2);
+  const [stepsFile, target] = process.argv.slice(2);
   const steps = JSON.parse(fs.readFileSync(stepsFile, 'utf8'));
-  const transcript = await play(steps, { url });
+  const server = await serve(target);
+  const transcript = await play(steps, { url: server.url }).finally(() => server.close());
   for (const t of transcript) {
     console.log(`${JSON.stringify(t.step)}\n  ${t.where} | ${t.text}`);
     for (const s of t.said ?? []) console.log(`    > ${s}`);

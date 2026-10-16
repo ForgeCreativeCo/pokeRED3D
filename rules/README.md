@@ -17,8 +17,8 @@ git and is regenerated locally.
 npm install
 npm run setup:decomp              # once: clones pret/pokefirered into vendor/
 npm run classify -- PalletTown    # classify + debug overlays
-npm run bake -- PalletTown Route1 PalletTown_PlayersHouse_2F   # bake maps + a 3D preview
-npm run serve                     # preview at http://localhost:5179 (large bakes won't open from disk)
+npm run bake -- PalletTown Route1 PalletTown_PlayersHouse_2F   # bake maps for the game
+npm run dev                       # play them at http://localhost:5173
 ```
 
 Outputs:
@@ -27,7 +27,11 @@ Outputs:
 - `build/debug/classify.html`: map and tileset views; hover a cell to see why it got its class
 - `build/debug/maps/*_classes.png`, `build/debug/tilesets/*_classes.png`: the same overlays as images
 - `build/maps/<Map>/map.json` + `atlas.png`: the baked map (format below)
-- `build/debug/view3d.html`: 3D preview of every map in the bake. Connected outdoor maps form one area; each interior is its own area, reached through doors, exit mats and stairs. It starts where a new game does (Red's bedroom) when that map is in the bake. Walk with WASD, hop ledges, tune the camera, and compare against the original GBA view. `window.pokered.walk(dir, seconds)` drives it from a script.
+- `build/data/world.json`: which maps are in the bake and where each sits. Connected outdoor maps form one area; each interior is its own area, reached through doors, exit mats and stairs. `start` is where a new game begins (Red's bedroom) when that map is in the bake.
+- `build/data/scripts.json`, `build/data/music.json`: the scripts and text, and the songs with their samples (see below)
+
+The game (`src/`, `npm run dev`) loads these. Walk with WASD, hop ledges,
+tune the camera from the panel, and compare against the original GBA view.
 
 ## How a metatile gets its class
 
@@ -112,6 +116,21 @@ Quads in JSON keep the format engine-neutral: the game reads them with
 three.js today, and a glTF export could be generated from the same data if
 another renderer ever needs it.
 
+Alongside the maps, `build/data/` holds what the whole bake shares:
+
+```jsonc
+// world.json
+{
+  "format": { "name": "pokered3d-world", "version": 1 },
+  "maps": [ { "map": "PalletTown", "area": 0, "ox": 0, "oy": 0 }, ... ],  // offsets in tiles
+  "start": { "map": "PalletTown_PlayersHouse_2F", "x": 6, "y": 6, "facing": "down" }  // or null
+}
+// scripts.json: { "scripts": { label: [[command, ...args]] }, "text", "consts", "textColors", "startFlags" }
+// music.json:   { "songs": { name: song }, "samples": { name: 8-bit PCM, base64 }, "waves" }
+```
+
+`src/data/types.ts` types every one of these files.
+
 ## Planned rule sets
 
 | Rule set | Status | Notes |
@@ -144,8 +163,8 @@ Each map's `music` (`MUS_PALLET`, …) is baked from the decomp's sound data by
 `tools/baker/lib/music.js`: the song's MIDI (with its `[` / `]` loop markers),
 its voicegroup from `midi.cfg`, and the samples and wave shapes those voices
 use. Every note is resolved to the exact voice FireRed's sound engine would
-pick (key-split tables and drum kits included), so the preview's small
-WebAudio synth only plays voices: 8-bit samples with their loop points,
+pick (key-split tables and drum kits included), so the game's small
+WebAudio synth (`src/audio/music.ts`) only plays voices: 8-bit samples with their loop points,
 square waves at the GB duty cycles, the wave channel and noise, with the
 engine's envelopes, volume, pan, pitch bend and vibrato. Music starts on the
 first key press or tap (browsers require one) and fades between songs when
@@ -156,7 +175,7 @@ the map's music changes.
 Press A (Z, Enter or Space, or the on-screen A button) to talk to the person
 you're facing, across a counter too, or to read a sign. The scripts and text
 are the decomp's own, baked by `tools/baker/lib/scripts.js` from everything
-the maps' people and signs can reach. The preview's script player runs the
+the maps' people and signs can reach. The game's script player (`src/scripts/vm.ts`) runs the
 common commands: messages (NPC, sign, yes/no), text colour by sprite, flags
 and variables starting from a new save, `goto`/`call`/`switch` and their
 conditions, simple movements and `!` emotes, items given or found. Commands
@@ -178,9 +197,10 @@ you at the edge of town, leads you to the lab, Blue complains, you choose a
 starter, Blue takes his, and he challenges you on the way out (the battle
 itself is skipped for now).
 
-The preview's `window.pokered` test hook can drive all of this: `go(map, x,
+The game's `window.pokered` test hook can drive all of this: `go(map, x,
 y)`, `walk(dir, seconds)`, `press('a')`, `tick(seconds)`, `run(label)`,
-`text()`, `people()` and `lastCommand`.
+`text()`, `people()` and `lastCommand`. The opening is played this way as
+a golden play-through (see the main README's Testing section).
 
 Not yet: trainer battles, the start menu, Pokémon pictures (`showmonpic`).
 
