@@ -6,9 +6,11 @@
     "setup:decomp": "git clone --depth 1 https://github.com/pret/pokefirered.git vendor/pokefirered",
     "classify": "node tools/baker/classify.js",
     "bake": "node tools/baker/bake.js",
-    "serve": "node tools/serve.js"
+    "serve": "node tools/serve.js",
+    "playthrough": "node tests/playthrough/record.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "pngjs": "^7.0.0",
     "yaml": "^2.6.1"
   }
