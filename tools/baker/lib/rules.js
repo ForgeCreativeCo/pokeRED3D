@@ -32,6 +32,7 @@ export function loadRules() {
   const height = readYaml(path.join(RULES_DIR, 'height.yaml'));
   const standup = readYaml(path.join(RULES_DIR, 'standup.yaml'));
   const { cameras } = readYaml(path.join(RULES_DIR, 'camera.yaml'));
+  const billboards = readYaml(path.join(RULES_DIR, 'billboards.yaml'));
   for (const cls of standup.buildings.classes) checkClass(cls, 'standup.yaml buildings');
   for (const cls of Object.keys(standup.objects)) checkClass(cls, 'standup.yaml objects');
   if (!cameras.default) throw new Error('camera.yaml: needs a `default` camera');
@@ -43,6 +44,7 @@ export function loadRules() {
     height,
     standup,
     cameras,
+    billboards,
     /** rules/maps/<name>.yaml, or {} */
     map(name) {
       const file = path.join(RULES_DIR, 'maps', `${name}.yaml`);

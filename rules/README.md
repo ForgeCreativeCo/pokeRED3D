@@ -116,7 +116,7 @@ generated from the same data.
 | Height | **done** | Cliffs on routes will need real elevation changes to test |
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
 | Prop grouping | partly | Buildings are grouped; objects are per-column chunks so far |
-| Billboards | next | NPCs and player: yaw-only quads, shadow blobs, sort order |
+| Billboards | **done** | Real overworld sprites from the decomp, yaw-only, screen-size matched, shadows, hidden flags (`billboards.yaml`) |
 | Materials and colour | later | Per-class shading, palette grading, water shader |
 | Per-map camera | **started** | Presets in `camera.yaml`; `rules/maps/<Map>.yaml` can pick one |
 

@@ -7,6 +7,7 @@
 
 import { readMap, readLayout, tilesetPair, NUM_METATILES_IN_PRIMARY } from './decomp.js';
 import { renderMetatile, Image, AtlasPacker } from './raster.js';
+import { readSprite } from './sprites.js';
 
 export const FORMAT = { name: 'pokered3d-map', version: 1 };
 
@@ -246,6 +247,20 @@ export function bakeMap(name, rules, lookup) {
     }
   }
 
+  // ---- sprites ----
+  const B = rules.billboards;
+  const hiddenRes = (B.hidden_flags ?? []).map((g) => new RegExp('^' + g.replace(/\*/g, '\\w*') + '$'));
+  const sprites = {};
+  for (const gfx of new Set([B.player, ...(map.object_events ?? []).map((o) => o.graphics_id)])) {
+    try {
+      const s = readSprite(gfx);
+      sprites[gfx] = { width: s.width, height: s.height, shadow: B.shadows?.[s.shadowSize] ?? 0.3, frames: s.frames.map((f) => packer.add(f)) };
+    } catch (err) {
+      console.warn(`  ${name}: no sprite for ${gfx} (${err.message}); it will show as a marker`);
+    }
+  }
+  const facings = { MOVEMENT_TYPE_FACE_UP: 'up', MOVEMENT_TYPE_FACE_DOWN: 'down', MOVEMENT_TYPE_FACE_LEFT: 'left', MOVEMENT_TYPE_FACE_RIGHT: 'right' };
+
   const cameraName = mapRules.camera ?? (map.map_type === 'MAP_TYPE_INDOOR' ? 'interior' : 'default');
   return {
     atlas: packer.build(),
@@ -265,7 +280,14 @@ export function bakeMap(name, rules, lookup) {
       },
       connections: map.connections ?? [],
       warps: map.warp_events ?? [],
-      objects: (map.object_events ?? []).map((o) => ({ id: o.local_id, gfx: o.graphics_id, x: o.x, y: o.y, movement: o.movement_type, script: o.script })),
+      objects: (map.object_events ?? []).map((o) => ({
+        id: o.local_id, gfx: o.graphics_id, x: o.x, y: o.y, elevation: o.elevation,
+        movement: o.movement_type, facing: facings[o.movement_type] ?? 'down',
+        range: [o.movement_range_x ?? 0, o.movement_range_y ?? 0],
+        hidden: hiddenRes.some((re) => re.test(String(o.flag))), flag: o.flag, script: o.script,
+      })),
+      sprites,
+      billboards: { player: B.player, lean: B.lean, matchScreenSize: B.match_screen_size, feetOffset: B.feet_offset, stepSeconds: B.step_seconds },
       signs: (map.bg_events ?? []).map((b) => ({ type: b.type, x: b.x, y: b.y, script: b.script })),
       structures: { buildings, objects },
       atlas: { file: 'atlas.png' },

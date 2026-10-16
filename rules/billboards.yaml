@@ -1,0 +1,35 @@
+# Billboard rule: how the player and NPC sprites stand in the 2.5D view.
+#
+# Sprites are flat quads that turn to face the camera around the vertical axis
+# only, so they never tip over when the camera orbits.
+
+# The sprite the player uses.
+player: OBJ_EVENT_GFX_RED_NORMAL
+
+# Degrees a sprite tips back from vertical, toward the camera. Some lean keeps
+# the art from looking squashed under a tilted camera; too much and a sprite
+# standing against a wall pokes through it.
+lean: 20
+
+# Scale sprites so they appear the same size on screen as in FireRed, relative
+# to the ground tiles, whatever the camera pitch.
+match_screen_size: true
+
+# How far in front of the cell centre the sprite's feet stand (tiles), so the
+# leaning sprite stays clear of a wall in the cell behind.
+feet_offset: 0.2
+
+# Soft shadow under each sprite: radius in tiles per FireRed shadow size.
+shadows:
+  SHADOW_SIZE_S: 0.22
+  SHADOW_SIZE_M: 0.3
+  SHADOW_SIZE_L: 0.45
+  SHADOW_SIZE_XL: 0.6
+
+# Seconds per step, and how often the walk cycle swaps feet (FireRed: one step
+# is 16 frames at 60 fps; the walk frame shows for the first half).
+step_seconds: 0.267
+
+# Objects whose visibility flag matches one of these start hidden, as they do
+# on a new save file (Professor Oak in Pallet Town, for example).
+hidden_flags: ["FLAG_HIDE_*"]

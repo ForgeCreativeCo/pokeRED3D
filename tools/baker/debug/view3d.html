@@ -1,49 +1,149 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Map Preview</title>
+<title>Pallet Town 2.5D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
-  :root { --panel: #ffffffe6; --fg: #1d1d1b; --muted: #6b6b66; --line: #ddddd8; }
-  @media (prefers-color-scheme: dark) { :root { --panel: #22221fe6; --fg: #ececea; --muted: #9a9a94; --line: #34342f; } }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font: 13px/1.4 system-ui, sans-serif; }
-  #ui { position: fixed; top: 10px; left: 10px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; max-width: calc(100vw - 44px); }
-  #ui b { font-size: 14px; }
-  #ui label { display: flex; gap: 8px; align-items: center; color: var(--muted); }
-  #ui output { font-variant-numeric: tabular-nums; color: var(--fg); min-width: 2.5em; }
-  #ui small { color: var(--muted); }
+  /* Layout: the baked map fills the screen; a collapsible tuning panel floats top-left, a d-pad bottom-right. */
+  :root {
+    --sky: #9fd3e8;
+    --panel: #fbfaf5;
+    --panel-edge: #d9d4c3;
+    --ink: #22261f;
+    --muted: #667060;
+    --accent: #d6342c;        /* the player marker's red */
+    --accent-ink: #ffffff;
+    --pad: #ffffffcc;
+    --font-display: "Pixelify Sans", "Courier New", monospace;
+    --font-ui: "Atkinson Hyperlegible", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --sky: #1d2a33; --panel: #20231d; --panel-edge: #3a4034; --ink: #ecefe4; --muted: #a2ab96;
+      --accent: #f0645a; --accent-ink: #1a0d0c; --pad: #2a2e26cc; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --sky: #1d2a33; --panel: #20231d; --panel-edge: #3a4034; --ink: #ecefe4; --muted: #a2ab96;
+    --accent: #f0645a; --accent-ink: #1a0d0c; --pad: #2a2e26cc; color-scheme: dark;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--sky); color: var(--ink); font: 14px/1.4 var(--font-ui); }
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+  #panel {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    width: min(300px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 10px;
+    box-shadow: 0 6px 24px #0000002a;
+  }
+  #panel summary {
+    list-style: none; cursor: pointer; padding: 10px 14px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  h1 { margin: 0; font: 700 18px/1.1 var(--font-display); letter-spacing: .02em; text-wrap: balance; }
+  .hint { color: var(--muted); font-size: 12px; }
+  #panel[open] summary .hint::after { content: "hide"; }
+  #panel:not([open]) summary .hint::after { content: "show"; }
+  .body { padding: 0 14px 14px; display: grid; gap: 12px; }
+  .readout { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .readout dt { color: var(--muted); }
+  .readout dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+  legend { padding: 0; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .slider { display: grid; grid-template-columns: 3.2em 1fr 2.4em; align-items: center; gap: 8px; }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .check { display: flex; gap: 8px; align-items: center; }
+  input[type=checkbox] { accent-color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button.action {
+    font: 700 13px var(--font-ui); border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--panel-edge); }
+  #copied { font-size: 12px; color: var(--muted); }
+  #yaml { width: 100%; font: 12px ui-monospace, monospace; color: var(--ink); background: transparent; border: 1px dashed var(--panel-edge); border-radius: 6px; padding: 6px; }
+  .foot { font-size: 12px; color: var(--muted); }
+
+  #dpad {
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 4px;
+    user-select: none; -webkit-user-select: none;
+  }
+  #dpad button {
+    border: 1px solid var(--panel-edge); border-radius: 10px; background: var(--pad); color: var(--ink);
+    font: 700 18px var(--font-display); cursor: pointer; touch-action: none;
+  }
+  #dpad button.held { background: var(--accent); color: var(--accent-ink); }
+  #dpad [data-dir=up] { grid-area: 1 / 2; } #dpad [data-dir=left] { grid-area: 2 / 1; }
+  #dpad [data-dir=right] { grid-area: 2 / 3; } #dpad [data-dir=down] { grid-area: 3 / 2; }
+  #error { position: fixed; inset: auto 16px 16px; padding: 12px 14px; border-radius: 8px; background: var(--panel); border: 1px solid var(--accent); }
 </style>
+
+<canvas id="stage" tabindex="0" aria-label="Pallet Town rendered in 2.5D. Use WASD or the arrow keys to walk."></canvas>
+
+<details id="panel" open>
+  <summary><h1 id="title">Pallet Town</h1><span class="hint"></span></summary>
+  <div class="body">
+    <dl class="readout">
+      <dt>cell</dt><dd id="rCell">–</dd>
+      <dt>class</dt><dd id="rClass">–</dd>
+      <dt>behavior</dt><dd id="rBehavior">–</dd>
+      <dt>height</dt><dd id="rHeight">–</dd>
+    </dl>
+    <fieldset>
+      <legend>Camera</legend>
+      <label class="slider" for="pitch">pitch <input type="range" id="pitch" min="25" max="90"> <output id="pitchOut"></output></label>
+      <label class="slider" for="fov">fov <input type="range" id="fov" min="10" max="60"> <output id="fovOut"></output></label>
+      <label class="slider" for="view">view <input type="range" id="view" min="6" max="30"> <output id="viewOut"></output></label>
+      <div class="row">
+        <button class="action" id="copy" type="button">Copy for camera.yaml</button>
+        <button class="action ghost" id="reset" type="button">Reset</button>
+        <span id="copied" role="status"></span>
+      </div>
+      <input id="yaml" readonly hidden aria-label="Camera settings as YAML">
+    </fieldset>
+    <fieldset>
+      <legend>View</legend>
+      <label class="check" for="shade"><input type="checkbox" id="shade" checked> Lighting</label>
+      <label class="check" for="orbit"><input type="checkbox" id="orbit"> Free orbit camera (drag to rotate)</label>
+    </fieldset>
+    <p class="foot" id="foot"></p>
+  </div>
+</details>
+
+<div id="dpad" aria-label="Walk">
+  <button type="button" data-dir="up" aria-label="Walk north">▲</button>
+  <button type="button" data-dir="left" aria-label="Walk west">◀</button>
+  <button type="button" data-dir="right" aria-label="Walk east">▶</button>
+  <button type="button" data-dir="down" aria-label="Walk south">▼</button>
+</div>
+
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-</head>
-<body>
-<div id="ui">
-  <b id="title"></b>
-  <label><input type="checkbox" id="orbit"> free orbit camera</label>
-  <label><input type="checkbox" id="shade" checked> shading</label>
-  <label>pitch <input type="range" id="pitch" min="25" max="90"> <output id="pitchOut"></output></label>
-  <label>fov <input type="range" id="fov" min="10" max="60"> <output id="fovOut"></output></label>
-  <label>view <input type="range" id="view" min="6" max="30"> <output id="viewOut"></output></label>
-  <small>WASD / arrows to walk · cell <span id="pos"></span></small>
-</div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 /*DATA*/
 
 const $ = (id) => document.getElementById(id);
-$('title').textContent = `${MAP.name} — ${MAP.quads.length} quads`;
+const pretty = MAP.name.replace(/([a-z])([A-Z0-9])/g, '$1 $2');
+$('title').textContent = pretty;
+$('foot').textContent = `${MAP.width}×${MAP.height} tiles · ${MAP.quads.length} quads · ${MAP.structures.buildings.length} buildings · ${MAP.structures.objects.length} standing objects. Click the map, then walk with WASD or the arrow keys.`;
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(devicePixelRatio);
-renderer.setSize(innerWidth, innerHeight);
+const canvas = $('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-document.body.append(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#9fd3e8');
@@ -52,7 +152,7 @@ const sun = new THREE.DirectionalLight('#fff4e0', 1.6);
 sun.position.set(-6, 14, 8);
 scene.add(sun);
 
-// ---- map geometry from baked quads ----
+// ---- map geometry from the baked quads ----
 const tex = await new THREE.TextureLoader().loadAsync(ATLAS);
 tex.magFilter = tex.minFilter = THREE.NearestFilter;
 tex.generateMipmaps = false;
@@ -86,93 +186,227 @@ const opaque = new THREE.Mesh(build((q) => !q.a), mats.lit[0]);
 const cutout = new THREE.Mesh(build((q) => q.a), mats.lit[1]);
 scene.add(opaque, cutout);
 
-// ---- player and NPC markers ----
-const W = MAP.width, H = MAP.height, G = MAP.grid;
+// ---- characters: camera-facing sprite billboards ----
+const W = MAP.width, H = MAP.height, G = MAP.grid, BB = MAP.billboards;
 const at = (x, y) => y * W + x;
-const marker = (colour) => {
-  const m = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.9, 16), new THREE.MeshLambertMaterial({ color: colour }));
-  body.position.y = 0.45;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshLambertMaterial({ color: '#f5d0a8' }));
-  head.position.y = 1.05;
-  m.add(body, head);
-  return m;
-};
-for (const o of MAP.objects) {
-  const m = marker('#6d7a8c');
-  m.position.set(o.x + 0.5, G.height[at(o.x, o.y)] ?? 0, o.y + 0.5);
-  scene.add(m);
-}
-const player = marker('#d6342c');
-scene.add(player);
-const start = MAP.warps[0] ? { x: MAP.warps[0].x, y: MAP.warps[0].y + 1 } : { x: W >> 1, y: H >> 1 };
-const P = { x: start.x, y: start.y, from: null, t: 1 };
-const place = () => {
-  const k = P.from ? Math.min(P.t, 1) : 1;
-  const fx = P.from ? P.from.x : P.x, fy = P.from ? P.from.y : P.y;
-  const x = fx + (P.x - fx) * k, y = fy + (P.y - fy) * k;
-  const h = G.height[at(P.x, P.y)];
-  player.position.set(x + 0.5, h, y + 0.5);
-  $('pos').textContent = `${P.x},${P.y}`;
-};
+const steps = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+// FireRed frame order: 0 face S, 1 N, 2 W, 3-4 walk S, 5-6 walk N, 7-8 walk W; east mirrors west.
+const standFrame = { down: 0, up: 1, left: 2, right: 2 };
+const walkFrames = { down: [3, 4], up: [5, 6], left: [7, 8], right: [7, 8] };
+const spriteMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
+const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 
-const keys = new Set();
-addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
-addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-const moves = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
-function tryMove() {
-  for (const [k, [dx, dy]] of Object.entries(moves)) {
-    if (!keys.has(k)) continue;
-    const nx = P.x + dx, ny = P.y + dy;
-    if (nx < 0 || ny < 0 || nx >= W || ny >= H || !G.walkable[at(nx, ny)]) return;
-    P.from = { x: P.x, y: P.y };
-    P.x = nx; P.y = ny; P.t = 0;
-    return;
+function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0] }) {
+  const s = MAP.sprites[gfx];
+  const a = { gfx, s, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
+  a.root = new THREE.Group();
+  a.tilt = new THREE.Group();
+  a.root.add(a.tilt);
+  if (s) {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.translate(0, 0.5, 0); // pivot at the feet
+    a.sprite = new THREE.Mesh(geo, spriteMat);
+    a.tilt.add(a.sprite);
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(s.shadow, 20), shadowMat);
+    sh.rotation.x = -Math.PI / 2;
+    sh.scale.y = 0.55;
+    sh.position.y = 0.02;
+    a.root.add(sh);
+  } else {
+    // No sprite in the decomp for this one: a plain marker keeps it visible.
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 1, 12), new THREE.MeshLambertMaterial({ color: '#6d7a8c' }));
+    m.position.y = 0.5;
+    a.root.add(m);
   }
+  scene.add(a.root);
+  return a;
 }
+
+function setFrame(a, frame, mirror) {
+  const [u0, v0, u1, v1] = a.s.frames[frame] ?? a.s.frames[0];
+  const uv = a.sprite.geometry.attributes.uv;
+  const [l, r] = mirror ? [u1, u0] : [u0, u1];
+  // PlaneGeometry vertex order: top-left, top-right, bottom-left, bottom-right.
+  uv.setXY(0, l / AW, v0 / AH); uv.setXY(1, r / AW, v0 / AH);
+  uv.setXY(2, l / AW, v1 / AH); uv.setXY(3, r / AW, v1 / AH);
+  uv.needsUpdate = true;
+}
+
+const start = MAP.warps[0] ? { x: MAP.warps[0].x, y: MAP.warps[0].y + 1 } : { x: W >> 1, y: H >> 1 };
+const player = makeActor({ gfx: BB.player, x: start.x, y: start.y });
+const npcs = MAP.objects.filter((o) => !o.hidden).map((o) => makeActor(o));
+const actors = [player, ...npcs];
+
+const occupied = (x, y, self) => actors.some((a) => a !== self && ((a.x === x && a.y === y) || (a.from && a.from.x === x && a.from.y === y)));
+const canEnter = (x, y, self) => x >= 0 && y >= 0 && x < W && y < H && G.walkable[at(x, y)] && !occupied(x, y, self);
+function startStep(a, dir) {
+  const [dx, dy] = steps[dir];
+  a.facing = dir;
+  if (!canEnter(a.x + dx, a.y + dy, a)) return false;
+  a.from = { x: a.x, y: a.y };
+  a.x += dx; a.y += dy; a.t = 0;
+  a.parity ^= 1; // alternate feet each step
+  return true;
+}
+
+// Size so a sprite covers the same screen area as in FireRed, relative to ground tiles.
+function spriteScale(a, pitchDeg) {
+  const rows = a.s.height / 16, cols = a.s.width / 16;
+  const p = (pitchDeg * Math.PI) / 180, lean = (BB.lean * Math.PI) / 180;
+  const len = BB.matchScreenSize ? (rows * Math.sin(p)) / Math.cos(p - lean) : rows;
+  return [cols, len];
+}
+
+function placeActor(a, camPos, pitchDeg) {
+  const k = a.from ? Math.min(a.t, 1) : 1;
+  const fx = a.from ? a.from.x : a.x, fy = a.from ? a.from.y : a.y;
+  const x = fx + (a.x - fx) * k + 0.5, z = fy + (a.y - fy) * k + 0.5;
+  const h0 = G.height[at(fx, fy)], h1 = G.height[at(a.x, a.y)];
+  const yaw = Math.atan2(camPos.x - x, camPos.z - z);
+  const off = BB.feetOffset ?? 0;
+  a.root.position.set(x + Math.sin(yaw) * off, h0 + (h1 - h0) * k, z + Math.cos(yaw) * off);
+  a.root.rotation.y = yaw;
+  if (!a.sprite) return;
+  a.tilt.rotation.x = (-BB.lean * Math.PI) / 180;
+  const [sx, sy] = spriteScale(a, pitchDeg);
+  a.sprite.scale.set(sx, sy, 1);
+  const moving = a.from && a.t < 0.5;
+  const frame = moving ? walkFrames[a.facing][a.parity] : standFrame[a.facing];
+  setFrame(a, frame, a.facing === 'right');
+}
+
+let lastCell = '';
+function readout() {
+  const i = at(player.x, player.y), cellKey = `${player.x},${player.y},${player.facing}`;
+  if (cellKey === lastCell) return;
+  lastCell = cellKey;
+  $('rCell').textContent = `${player.x}, ${player.y}  (elevation ${G.elevation[i]}, facing ${player.facing})`;
+  $('rClass').textContent = G.class[i];
+  $('rBehavior').textContent = G.behavior[i];
+  $('rHeight').textContent = G.height[i];
+}
+
+// NPC movement types: FACE_* stand still, WANDER_* roam inside their range, LOOK_AROUND turns.
+function updateNpc(a, dt) {
+  if (a.from) return;
+  a.wait -= dt;
+  if (a.wait > 0) return;
+  a.wait = 1 + Math.random() * 3;
+  const m = a.movement;
+  let dirs = null;
+  if (m === 'MOVEMENT_TYPE_WANDER_AROUND') dirs = ['up', 'down', 'left', 'right'];
+  else if (m === 'MOVEMENT_TYPE_WANDER_UP_AND_DOWN') dirs = ['up', 'down'];
+  else if (m === 'MOVEMENT_TYPE_WANDER_LEFT_AND_RIGHT') dirs = ['left', 'right'];
+  if (m === 'MOVEMENT_TYPE_LOOK_AROUND') { a.facing = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)]; return; }
+  if (!dirs) return;
+  const dir = dirs[Math.floor(Math.random() * dirs.length)];
+  const [dx, dy] = steps[dir];
+  const nx = a.x + dx - a.home.x, ny = a.y + dy - a.home.y;
+  if (Math.abs(nx) > a.range[0] || Math.abs(ny) > a.range[1]) { a.facing = dir; return; }
+  startStep(a, dir);
+}
+
+// ---- input: keyboard and d-pad ----
+const held = new Set();
+const keyDirs = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' };
+addEventListener('keydown', (e) => {
+  const dir = keyDirs[e.key.toLowerCase()];
+  if (!dir || e.target.closest?.('input')) return;
+  held.add(dir);
+  e.preventDefault();
+});
+addEventListener('keyup', (e) => { const dir = keyDirs[e.key.toLowerCase()]; if (dir) held.delete(dir); });
+addEventListener('blur', () => held.clear());
+for (const b of document.querySelectorAll('#dpad button')) {
+  const dir = b.dataset.dir;
+  const on = (e) => { e.preventDefault(); held.add(dir); b.classList.add('held'); b.setPointerCapture?.(e.pointerId); };
+  const off = () => { held.delete(dir); b.classList.remove('held'); };
+  b.addEventListener('pointerdown', on);
+  b.addEventListener('pointerup', off);
+  b.addEventListener('pointercancel', off);
+  b.addEventListener('lostpointercapture', off);
+}
+// Like FireRed: tapping a new direction turns on the spot; holding it walks.
+function playerInput(dt) {
+  const dir = [...held].pop();
+  if (!dir) { player.turnHold = 0; return; }
+  if (dir !== player.facing && player.turnHold <= 0) { player.facing = dir; player.turnHold = 0.12; return; }
+  player.turnHold -= dt;
+  if (player.turnHold <= 0) startStep(player, dir);
+}
+canvas.addEventListener('pointerdown', () => canvas.focus());
 
 // ---- camera ----
-const cam = new THREE.PerspectiveCamera(MAP.camera.fov, innerWidth / innerHeight, 0.1, 500);
-const orbit = new OrbitControls(cam, renderer.domElement);
+const cam = new THREE.PerspectiveCamera(MAP.camera.fov, 1, 0.1, 500);
+const orbit = new OrbitControls(cam, canvas);
 orbit.enabled = false;
-const settings = { pitch: MAP.camera.pitch, fov: MAP.camera.fov, view: MAP.camera.view };
+const baked = { pitch: MAP.camera.pitch, fov: MAP.camera.fov, view: MAP.camera.view };
+const settings = { ...baked };
+const syncSliders = () => {
+  for (const k of ['pitch', 'fov', 'view']) { $(k).value = settings[k]; $(k + 'Out').textContent = settings[k]; }
+};
 for (const k of ['pitch', 'fov', 'view']) {
-  $(k).value = settings[k];
-  $(k + 'Out').textContent = settings[k];
-  $(k).oninput = () => { settings[k] = +$(k).value; $(k + 'Out').textContent = settings[k]; };
+  $(k).addEventListener('input', () => { settings[k] = +$(k).value; $(k + 'Out').textContent = settings[k]; });
 }
+syncSliders();
+$('reset').onclick = () => { Object.assign(settings, baked); syncSliders(); };
+$('copy').onclick = () => {
+  const line = `  ${MAP.camera.preset}: { pitch: ${settings.pitch}, fov: ${settings.fov}, view: ${settings.view} }`;
+  const showFallback = () => { const y = $('yaml'); y.value = line.trim(); y.hidden = false; y.select(); $('copied').textContent = 'Select and copy this line'; };
+  try {
+    navigator.clipboard.writeText(line).then(() => { $('copied').textContent = 'Copied'; $('yaml').hidden = true; }, showFallback);
+  } catch { showFallback(); }
+};
 $('orbit').onchange = () => {
   orbit.enabled = $('orbit').checked;
-  if (orbit.enabled) { orbit.target.copy(player.position); orbit.update(); }
+  if (orbit.enabled) { orbit.target.copy(player.root.position); orbit.update(); }
 };
 $('shade').onchange = () => {
   const m = $('shade').checked ? mats.lit : mats.flat;
   opaque.material = m[0]; cutout.material = m[1];
 };
+// Small screens start with the panel folded so the map is visible.
+if (matchMedia('(max-width: 600px)').matches) $('panel').open = false;
+
 function followCamera() {
   cam.fov = settings.fov;
   const d = settings.view / 2 / Math.tan((settings.fov * Math.PI) / 360);
   const p = (settings.pitch * Math.PI) / 180;
-  const t = player.position.clone().add(new THREE.Vector3(0, 0.5, 0));
+  const t = player.root.position.clone().add(new THREE.Vector3(0, 0.5, 0));
   cam.position.set(t.x, t.y + d * Math.sin(p), t.z + d * Math.cos(p));
   cam.lookAt(t);
   cam.updateProjectionMatrix();
 }
-
-addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight);
-  cam.aspect = innerWidth / innerHeight;
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  cam.aspect = w / h;
   cam.updateProjectionMatrix();
-});
+}
+addEventListener('resize', resize);
+resize();
 
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
-  const dt = (now - last) / 1000; last = now;
-  if (P.t < 1) P.t += dt / 0.25; else { P.from = null; tryMove(); }
-  place();
+  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+  for (const a of actors) {
+    if (a.from) { a.t += dt / BB.stepSeconds; if (a.t >= 1) { a.from = null; a.t = 1; } }
+  }
+  if (!player.from) playerInput(dt);
+  for (const a of npcs) updateNpc(a, dt);
+  for (const a of actors) placeActor(a, cam.position, settings.pitch);
+  readout();
   if (orbit.enabled) orbit.update(); else followCamera();
   renderer.render(scene, cam);
 });
 </script>
-</body>
-</html>
+<script>
+// If the 3D library can't load, say so instead of showing a blank sky.
+addEventListener('error', (e) => {
+  if (document.getElementById('error')) return;
+  const box = document.createElement('div');
+  box.id = 'error';
+  box.textContent = `The 3D view couldn't start: ${e.message || 'a script failed to load'}. Reload the page to try again.`;
+  document.body.append(box);
+}, true);
+</script>
