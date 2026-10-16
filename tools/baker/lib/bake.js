@@ -5,7 +5,7 @@
 // as seen in its texture, and `uv` is the pixel rect [u0, v0, u1, v1] in the
 // atlas (v grows downward), so the texture's bottom edge maps to p0-p1.
 
-import { readMap, readLayout, tilesetPair, NUM_METATILES_IN_PRIMARY } from './decomp.js';
+import { readMap, readLayout, tilesetPair, metatileFor, NUM_METATILES_IN_PRIMARY } from './decomp.js';
 import { renderMetatile, Image, AtlasPacker } from './raster.js';
 import { readSprite } from './sprites.js';
 
@@ -226,6 +226,19 @@ export function bakeMap(name, rules, lookup) {
     groundImg.blit(img, c.x * 16, c.y * 16);
   }
   const g = packer.add(groundImg);
+
+  // ---- the original flat GBA view, for side-by-side comparison ----
+  // FireRed draws a metatile's first layer below sprites, and its second
+  // layer below them only for "covered" metatiles; otherwise above.
+  const below = new Image(W * 16, H * 16), above = new Image(W * 16, H * 16);
+  for (const c of cells) {
+    const covered = metatileFor(pair, c.metatile).layerType === 'covered';
+    below.blit(renderMetatile(pair, c.metatile, { layers: covered ? [0, 1] : [0] }), c.x * 16, c.y * 16);
+    if (!covered) above.blit(renderMetatile(pair, c.metatile, { layers: [1], backdrop: false }), c.x * 16, c.y * 16);
+  }
+  const borderImg = new Image(layout.border_width * 16, layout.border_height * 16);
+  layout.border.forEach((c, i) => borderImg.blit(renderMetatile(pair, c.metatile), (i % layout.border_width) * 16, Math.floor(i / layout.border_width) * 16));
+  const original = { below: packer.add(below), above: packer.add(above), border: packer.add(borderImg) };
   for (const c of cells) {
     const [u, v] = [g[0] + c.x * 16, g[1] + c.y * 16];
     const { x, y: z, h } = c;
@@ -291,6 +304,7 @@ export function bakeMap(name, rules, lookup) {
       signs: (map.bg_events ?? []).map((b) => ({ type: b.type, x: b.x, y: b.y, script: b.script })),
       structures: { buildings, objects },
       atlas: { file: 'atlas.png' },
+      original,
       quads,
     },
   };
