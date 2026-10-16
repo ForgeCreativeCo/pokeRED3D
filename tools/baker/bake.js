@@ -1,6 +1,7 @@
 // Bake maps to the runtime format:
 //   build/maps/<Map>/map.json   logic grid, entities, textured quads
 //   build/maps/<Map>/atlas.png  texture atlas for the quads
+//   build/data/*.json           world layout and start, scripts, music (the game loads these)
 //   build/debug/view3d.html     3D preview of every map baked, joined by their
 //                               connections, with the first map at the origin
 //
@@ -111,6 +112,16 @@ for (const m of new Set([...world.map((w) => w.data.music), ...scriptSongs])) {
   Object.assign(music.waves, r.waves);
 }
 console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.samples).length} samples)`);
+
+// The game loads these as files: the world's layout and start, the scripts
+// and the music. Each map's map.json and atlas.png are fetched by name.
+const DATA = path.join(OUT, 'data');
+fs.mkdirSync(DATA, { recursive: true });
+const layout = world.map(({ area, ox, oy, data }) => ({ map: data.name, area, ox, oy }));
+fs.writeFileSync(path.join(DATA, 'world.json'), JSON.stringify({ format: { name: 'pokered3d-world', version: 1 }, maps: layout, start }));
+fs.writeFileSync(path.join(DATA, 'scripts.json'), JSON.stringify(scripts));
+fs.writeFileSync(path.join(DATA, 'music.json'), JSON.stringify(music));
+console.log(`\nGame data: build/data/ (world, scripts, music)`);
 
 // The preview inlines everything so it opens straight from disk.
 const html = fs.readFileSync(path.join(import.meta.dirname, 'debug/view3d.html'), 'utf8')

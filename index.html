@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pokeRED3D</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<canvas id="stage" tabindex="0" aria-label="The map rendered in 2.5D. Use WASD or the arrow keys to walk."></canvas>
+<canvas id="gba" hidden aria-label="The same spot as it looks in FireRed on the Game Boy Advance."></canvas>
+<span class="pane-label" id="labelGba">FireRed · GBA 240×160</span>
+<span class="pane-label" id="label3d">pokeRED3D · 2.5D</span>
+<div id="topRight">
+  <button type="button" id="compareBtn" aria-pressed="false">Compare with FireRed</button>
+  <button type="button" id="musicBtn" aria-pressed="true">Music on</button>
+</div>
+
+<details id="panel" open>
+  <summary><h1 id="title">Pallet Town</h1><span class="hint"></span></summary>
+  <div class="body">
+    <dl class="readout">
+      <dt>cell</dt><dd id="rCell">–</dd>
+      <dt>class</dt><dd id="rClass">–</dd>
+      <dt>behavior</dt><dd id="rBehavior">–</dd>
+      <dt>height</dt><dd id="rHeight">–</dd>
+    </dl>
+    <fieldset>
+      <legend id="legendCam">Camera</legend>
+      <label class="slider" for="pitch">pitch <input type="range" id="pitch" min="25" max="90"> <output id="pitchOut"></output></label>
+      <label class="slider" for="fov">fov <input type="range" id="fov" min="10" max="60"> <output id="fovOut"></output></label>
+      <label class="slider" for="view">view <input type="range" id="view" min="6" max="30"> <output id="viewOut"></output></label>
+      <div class="row">
+        <button class="action" id="copy" type="button">Copy for camera.yaml</button>
+        <button class="action ghost" id="reset" type="button">Reset</button>
+        <span id="copied" role="status"></span>
+      </div>
+      <input id="yaml" readonly hidden aria-label="Camera settings as YAML">
+    </fieldset>
+    <fieldset>
+      <legend>View</legend>
+      <label class="check" for="shade"><input type="checkbox" id="shade" checked> Lighting</label>
+      <label class="check" for="orbit"><input type="checkbox" id="orbit"> Free orbit camera (drag to rotate)</label>
+    </fieldset>
+    <p class="foot" id="foot"></p>
+  </div>
+</details>
+
+<div id="fade" aria-hidden="true"></div>
+
+<div id="textbox" hidden data-style="normal" data-color="neutral" role="status" aria-live="polite"><p id="tb1"></p><p id="tb2"></p><span id="tbMore" hidden aria-hidden="true">▼</span></div>
+<div id="yesno" hidden><span id="yes">YES</span><span id="no">NO</span></div>
+<div id="emote" hidden aria-hidden="true"></div>
+<button type="button" id="aBtn" aria-label="A: talk, read, continue">A</button>
+
+<div id="dpad" aria-label="Walk">
+  <button type="button" data-dir="up" aria-label="Walk north">▲</button>
+  <button type="button" data-dir="left" aria-label="Walk west">◀</button>
+  <button type="button" data-dir="right" aria-label="Walk east">▶</button>
+  <button type="button" data-dir="down" aria-label="Walk south">▼</button>
+</div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
