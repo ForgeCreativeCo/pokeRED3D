@@ -13,6 +13,7 @@ import { assertDecomp, readMap, readLayout, mapNameById, newGame } from './lib/d
 import { loadRules } from './lib/rules.js';
 import { classifyTilesets } from './lib/classify.js';
 import { bakeMap } from './lib/bake.js';
+import { bakeSong } from './lib/music.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const OUT = path.join(ROOT, 'build');
@@ -90,9 +91,20 @@ const ng = newGame().start;
 const start = ng && baked.has(ng.map) ? { ...ng, facing: 'down' } : null;
 console.log(`\nWorld: ${areas} area(s); start ${start ? `${start.map} ${start.x},${start.y}` : `outside ${names[0]}'s first door`}`);
 
+// Music: every song the baked maps play, with the samples they share.
+const music = { songs: {}, samples: {}, waves: {} };
+for (const m of new Set(world.map((w) => w.data.music))) {
+  const r = m && bakeSong(m);
+  if (!r) { if (m) console.warn(`  no song data for ${m}`); continue; }
+  music.songs[m] = r.song;
+  Object.assign(music.samples, r.samples);
+  Object.assign(music.waves, r.waves);
+}
+console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.samples).length} samples)`);
+
 // The preview inlines everything so it opens straight from disk.
 const html = fs.readFileSync(path.join(import.meta.dirname, 'debug/view3d.html'), 'utf8')
-  .replace('/*DATA*/', `const WORLD = ${JSON.stringify(world)};\nconst START = ${JSON.stringify(start)};`);
+  .replace('/*DATA*/', `const WORLD = ${JSON.stringify(world)};\nconst START = ${JSON.stringify(start)};\nconst MUSIC = ${JSON.stringify(music)};`);
 fs.mkdirSync(path.join(OUT, 'debug'), { recursive: true });
 fs.writeFileSync(path.join(OUT, 'debug/view3d.html'), html);
 console.log(`\nPreview: build/debug/view3d.html`);

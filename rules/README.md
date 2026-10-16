@@ -119,6 +119,7 @@ generated from the same data.
 | Animation tagging | **done** | Ranges read from `src/tileset_anims.c` |
 | Height | **done** | Cliffs on routes will need real elevation changes to test |
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
+| Music | **done** | Map songs from the decomp's MIDI, voicegroups and samples |
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
 | Map connections | **done** | Maps placed by their connection offsets; walk across edges |
 | Prop grouping | partly | Buildings are grouped; objects are per-column chunks so far |
@@ -134,8 +135,22 @@ generated from the same data.
 - **Visibility** at the start comes from the decomp's new-game flag script, so Oak is hidden but Blue and the starters wait in the lab.
 - **Warps** follow FireRed: walk into a door, press the arrow's direction on an exit mat, or step onto stairs. Other cells listed as warps are inert.
 
+## Music
+
+Each map's `music` (`MUS_PALLET`, …) is baked from the decomp's sound data by
+`tools/baker/lib/music.js`: the song's MIDI (with its `[` / `]` loop markers),
+its voicegroup from `midi.cfg`, and the samples and wave shapes those voices
+use. Every note is resolved to the exact voice FireRed's sound engine would
+pick (key-split tables and drum kits included), so the preview's small
+WebAudio synth only plays voices: 8-bit samples with their loop points,
+square waves at the GB duty cycles, the wave channel and noise, with the
+engine's envelopes, volume, pan, pitch bend and vibrato. Music starts on the
+first key press or tap (browsers require one) and fades between songs when
+the map's music changes.
+
 ### Known gaps
 
 - Rocky cliffs and mountain tops come out as `roof`. The geometry is right (a raised surface), but they want their own class once the height rule exists.
 - Shoreline metatiles that share animated water-edge tiles can come out as `ground` or `roof`.
+- The synth approximates the GB channels' envelope timing and the engine's reverb; songs will sound close to FireRed, not identical.
 - NPCs with a variable sprite (`OBJ_EVENT_GFX_VAR_*`) are chosen at runtime by the game and show as a placeholder marker.

@@ -316,6 +316,7 @@ export function bakeMap(name, rules, lookup) {
       },
       connections: map.connections ?? [],
       indoor: map.map_type === 'MAP_TYPE_INDOOR',
+      music: map.music,
       warps: (map.warp_events ?? []).map((w) => ({
         x: w.x, y: w.y, behavior: cells[idx(w.x, w.y)].e.behavior,
         to: mapNameById(w.dest_map) ?? null, toWarp: Number(w.dest_warp_id),
