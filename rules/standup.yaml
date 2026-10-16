@@ -26,12 +26,16 @@ buildings:
 #   height_per_row  tiles of height per row of art (default 1)
 #   lean            degrees tipped back from vertical
 #   ground          what the flat ground under it shows: nearest (the nearest
-#                   plain ground tile) or shade (the same, darkened)
+#                   plain ground tile), shade (the same, darkened) or keep
+#                   (the original art, for low objects like ledges)
+#   walkable        also stand up walkable cells of this class (the flat art
+#                   stays underneath, and the player walks through the quad)
 objects:
+  tall_grass: { max_rows: 1, height_per_row: 0.55, lean: 30, walkable: true }
   tree: { max_rows: 2, height_per_row: 1.25, lean: 20, ground: shade }
   prop: { max_rows: 2 }
   sign: { max_rows: 2 }
-  ledge: { max_rows: 1, height_per_row: 0.5 }
+  ledge: { max_rows: 1, height_per_row: 0.5, ground: keep }
   furniture: { max_rows: 2 }
 
 # Cutting objects out of their background. A standing quad starts as the full

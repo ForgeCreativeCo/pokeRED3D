@@ -5,4 +5,5 @@
 #   0x281-0x283: { top: roof }                # inclusive range, set only `top`
 #   0x2a5: { class: ground, top: null, note: "why" }   # remove an overhang
 
-metatiles: {}
+metatiles:
+  0xec-0xed: { class: prop, note: "fence end posts; trees behind them make the column look like a roof" }

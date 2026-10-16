@@ -71,7 +71,7 @@ export function bakeMap(name, rules, lookup) {
   const objectRules = S.objects;
   const isBuildingCell = (c) => buildingClasses.has(c.e.class) || (c.walkable && c.e.top && buildingClasses.has(c.e.top));
   const objectClassOf = (c) => {
-    if (!c.walkable && objectRules[c.e.class]) return c.e.class;
+    if (objectRules[c.e.class] && (!c.walkable || objectRules[c.e.class].walkable)) return c.e.class;
     if (c.walkable && c.e.top && objectRules[c.e.top]) return c.e.top; // overhang over a walkable cell
     return null;
   };
@@ -87,7 +87,8 @@ export function bakeMap(name, rules, lookup) {
     return img;
   };
   const objectLayer = (c) => {
-    if (c.walkable) return renderMetatile(pair, c.metatile, { layers: [1], backdrop: false });
+    // A walk-behind overhang stands up only its second layer: the first is the ground.
+    if (c.walkable && c.e.top) return renderMetatile(pair, c.metatile, { layers: [1], backdrop: false });
     const img = renderMetatile(pair, c.metatile);
     if (S.object_cutout === 'background') {
       const bg = nearestGround.get(c);
@@ -187,13 +188,13 @@ export function bakeMap(name, rules, lookup) {
         if (inBuilding.has(n) || objectClassOf(n) !== cls) break;
         run.push(n);
         yy--;
-        if (n.walkable) break; // an overhang is always the top of its stack
+        if (n.walkable && n.e.top) break; // an overhang is always the top of its stack
       }
       const r = { max_rows: 1, height_per_row: 1, lean: 0, ...objectRules[cls] };
       for (let i = 0; i < run.length; i += r.max_rows) {
         let chunk = run.slice(i, i + r.max_rows);
         // Don't leave a lone overhang as its own chunk; fold it into this one.
-        if (i + r.max_rows === run.length - 1 && run[run.length - 1].walkable) { chunk = run.slice(i); i++; }
+        if (i + r.max_rows === run.length - 1 && run[run.length - 1].e.top) { chunk = run.slice(i); i++; }
         const bottom = chunk[0];
         const zf = bottom.y + 1;
         const h0 = bottom.h;
@@ -217,6 +218,8 @@ export function bakeMap(name, rules, lookup) {
     let img;
     if (c.walkable && c.e.top) {
       img = renderMetatile(pair, c.metatile, { layers: [0] }); // overhang: ground is the first layer
+    } else if (!inBuilding.has(c) && objectRules[standing.get(c)]?.ground === 'keep') {
+      img = renderMetatile(pair, c.metatile);
     } else if (inBuilding.has(c) || (standing.has(c) && !c.walkable)) {
       img = renderMetatile(pair, (nearestGround.get(c) ?? c).metatile);
       if (objectRules[standing.get(c)]?.ground === 'shade') darken(img, S.shade_amount);

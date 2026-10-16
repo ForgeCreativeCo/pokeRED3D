@@ -74,6 +74,19 @@ export function readLayout(id) {
   };
 }
 
+let mapIndex;
+/** "MAP_ROUTE21_NORTH" -> "Route21_North" (folder under data/maps) */
+export function mapNameById(id) {
+  if (!mapIndex) {
+    mapIndex = new Map();
+    for (const dir of fs.readdirSync(decompPath('data/maps'))) {
+      const file = decompPath('data/maps', dir, 'map.json');
+      if (fs.existsSync(file)) mapIndex.set(JSON.parse(fs.readFileSync(file, 'utf8')).id, dir);
+    }
+  }
+  return mapIndex.get(id);
+}
+
 export function readMap(name) {
   return JSON.parse(fs.readFileSync(decompPath('data/maps', name, 'map.json'), 'utf8'));
 }

@@ -114,7 +114,7 @@
   #error { position: fixed; inset: auto 16px 16px; padding: 12px 14px; border-radius: 8px; background: var(--panel); border: 1px solid var(--accent); }
 </style>
 
-<canvas id="stage" tabindex="0" aria-label="Pallet Town rendered in 2.5D. Use WASD or the arrow keys to walk."></canvas>
+<canvas id="stage" tabindex="0" aria-label="The map rendered in 2.5D. Use WASD or the arrow keys to walk."></canvas>
 <canvas id="gba" hidden aria-label="The same spot as it looks in FireRed on the Game Boy Advance."></canvas>
 <span class="pane-label" id="labelGba">FireRed · GBA 240×160</span>
 <span class="pane-label" id="label3d">pokeRED3D · 2.5D</span>
@@ -169,9 +169,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 /*DATA*/
 
 const $ = (id) => document.getElementById(id);
-const pretty = MAP.name.replace(/([a-z])([A-Z0-9])/g, '$1 $2');
-$('title').textContent = pretty;
-$('foot').textContent = `${MAP.width}×${MAP.height} tiles · ${MAP.quads.length} quads · ${MAP.structures.buildings.length} buildings · ${MAP.structures.objects.length} standing objects. Click the map, then walk with WASD or the arrow keys.`;
+const pretty = (name) => name.replace(/_/g, ' ').replace(/([a-z])([A-Z0-9])/g, '$1 $2');
 
 const canvas = $('stage');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -185,24 +183,36 @@ const sun = new THREE.DirectionalLight('#fff4e0', 1.6);
 sun.position.set(-6, 14, 8);
 scene.add(sun);
 
-// ---- map geometry from the baked quads ----
-const tex = await new THREE.TextureLoader().loadAsync(ATLAS);
-tex.magFilter = tex.minFilter = THREE.NearestFilter;
-tex.generateMipmaps = false;
-tex.flipY = false;
-tex.colorSpace = THREE.SRGBColorSpace;
-const AW = tex.image.width, AH = tex.image.height;
+// ---- maps: each has its own atlas and sits at its offset in world tiles ----
+const loader = new THREE.TextureLoader();
+const maps = await Promise.all(WORLD.map(async (w) => {
+  const tex = await loader.loadAsync(w.atlas);
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.flipY = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const D = w.data;
+  return {
+    D, G: D.grid, W: D.width, H: D.height, ox: w.ox, oy: w.oy, tex,
+    img: tex.image, AW: tex.image.width, AH: tex.image.height,
+    mats: {
+      lit: [new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
+      flat: [new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
+    },
+    spriteMat: new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide }),
+  };
+}));
 
-function build(filter) {
+function build(m, filter) {
   const pos = [], uv = [];
-  for (const q of MAP.quads) {
+  for (const q of m.D.quads) {
     if (!filter(q)) continue;
     const p = q.p, [u0, v0, u1, v1] = q.uv;
     const corners = [[0, u0, v1], [1, u1, v1], [2, u1, v0], [3, u0, v0]];
     for (const i of [0, 1, 2, 0, 2, 3]) {
       const [c, u, v] = corners[i];
-      pos.push(p[c * 3], p[c * 3 + 1], p[c * 3 + 2]);
-      uv.push(u / AW, v / AH);
+      pos.push(p[c * 3] + m.ox, p[c * 3 + 1], p[c * 3 + 2] + m.oy);
+      uv.push(u / m.AW, v / m.AH);
     }
   }
   const g = new THREE.BufferGeometry();
@@ -211,34 +221,47 @@ function build(filter) {
   g.computeVertexNormals();
   return g;
 }
-const mats = {
-  lit: [new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
-  flat: [new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 })],
-};
-const opaque = new THREE.Mesh(build((q) => !q.a), mats.lit[0]);
-const cutout = new THREE.Mesh(build((q) => q.a), mats.lit[1]);
-scene.add(opaque, cutout);
+for (const m of maps) {
+  m.opaque = new THREE.Mesh(build(m, (q) => !q.a), m.mats.lit[0]);
+  m.cutout = new THREE.Mesh(build(m, (q) => q.a), m.mats.lit[1]);
+  scene.add(m.opaque, m.cutout);
+}
+
+// ---- the world grid: every map's cells in shared world coordinates ----
+function locate(gx, gy) {
+  for (const m of maps) {
+    const x = gx - m.ox, y = gy - m.oy;
+    if (x >= 0 && y >= 0 && x < m.W && y < m.H) return { m, i: y * m.W + x, x, y };
+  }
+  return null;
+}
+const walkable = (gx, gy) => !!locate(gx, gy)?.m.G.walkable[locate(gx, gy).i];
+const heightAt = (gx, gy) => { const c = locate(gx, gy); return c ? c.m.G.height[c.i] : 0; };
+const behaviorAt = (gx, gy) => { const c = locate(gx, gy); return c ? c.m.G.behavior[c.i] : null; };
+
+const totals = maps.reduce((t, m) => ({ quads: t.quads + m.D.quads.length, npcs: t.npcs + m.D.objects.filter((o) => !o.hidden).length }), { quads: 0, npcs: 0 });
+$('foot').textContent = `${maps.map((m) => pretty(m.D.name)).join(', ')} · ${totals.quads} quads · ${totals.npcs} people. Click the map, then walk with WASD or the arrow keys.`;
 
 // ---- characters: camera-facing sprite billboards ----
-const W = MAP.width, H = MAP.height, G = MAP.grid, BB = MAP.billboards;
-const at = (x, y) => y * W + x;
+const BB = maps[0].D.billboards;
 const steps = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const jumpBehavior = { up: 'MB_JUMP_NORTH', down: 'MB_JUMP_SOUTH', left: 'MB_JUMP_WEST', right: 'MB_JUMP_EAST' };
 // FireRed frame order: 0 face S, 1 N, 2 W, 3-4 walk S, 5-6 walk N, 7-8 walk W; east mirrors west.
 const standFrame = { down: 0, up: 1, left: 2, right: 2 };
 const walkFrames = { down: [3, 4], up: [5, 6], left: [7, 8], right: [7, 8] };
-const spriteMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
+const JUMP_HEIGHT = 0.6; // tiles at the top of a ledge hop
 const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 
-function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0] }) {
-  const s = MAP.sprites[gfx];
-  const a = { gfx, s, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
+function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0] }, m) {
+  const s = m.D.sprites[gfx];
+  const a = { gfx, s, m, x, y, home: { x, y }, range, movement, facing, from: null, t: 1, jump: false, parity: 0, turnHold: 0, wait: 1 + Math.random() * 3 };
   a.root = new THREE.Group();
   a.tilt = new THREE.Group();
   a.root.add(a.tilt);
   if (s) {
     const geo = new THREE.PlaneGeometry(1, 1);
     geo.translate(0, 0.5, 0); // pivot at the feet
-    a.sprite = new THREE.Mesh(geo, spriteMat);
+    a.sprite = new THREE.Mesh(geo, m.spriteMat);
     a.tilt.add(a.sprite);
     const sh = new THREE.Mesh(new THREE.CircleGeometry(s.shadow, 20), shadowMat);
     sh.rotation.x = -Math.PI / 2;
@@ -247,9 +270,9 @@ function makeActor({ gfx, x, y, facing = 'down', movement = '', range = [0, 0] }
     a.root.add(sh);
   } else {
     // No sprite in the decomp for this one: a plain marker keeps it visible.
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 1, 12), new THREE.MeshLambertMaterial({ color: '#6d7a8c' }));
-    m.position.y = 0.5;
-    a.root.add(m);
+    const mk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 1, 12), new THREE.MeshLambertMaterial({ color: '#6d7a8c' }));
+    mk.position.y = 0.5;
+    a.tilt.add(mk);
   }
   scene.add(a.root);
   return a;
@@ -259,25 +282,31 @@ function setFrame(a, frame, mirror) {
   const [u0, v0, u1, v1] = a.s.frames[frame] ?? a.s.frames[0];
   const uv = a.sprite.geometry.attributes.uv;
   const [l, r] = mirror ? [u1, u0] : [u0, u1];
+  const { AW, AH } = a.m;
   // PlaneGeometry vertex order: top-left, top-right, bottom-left, bottom-right.
   uv.setXY(0, l / AW, v0 / AH); uv.setXY(1, r / AW, v0 / AH);
   uv.setXY(2, l / AW, v1 / AH); uv.setXY(3, r / AW, v1 / AH);
   uv.needsUpdate = true;
 }
 
-const start = MAP.warps[0] ? { x: MAP.warps[0].x, y: MAP.warps[0].y + 1 } : { x: W >> 1, y: H >> 1 };
-const player = makeActor({ gfx: BB.player, x: start.x, y: start.y });
-const npcs = MAP.objects.filter((o) => !o.hidden).map((o) => makeActor(o));
+const home = maps[0];
+const start = home.D.warps[0] ? { x: home.D.warps[0].x + home.ox, y: home.D.warps[0].y + 1 + home.oy } : { x: home.ox + (home.W >> 1), y: home.oy + (home.H >> 1) };
+const player = makeActor({ gfx: BB.player, x: start.x, y: start.y }, home);
+const npcs = maps.flatMap((m) => m.D.objects.filter((o) => !o.hidden).map((o) => makeActor({ ...o, x: o.x + m.ox, y: o.y + m.oy }, m)));
 const actors = [player, ...npcs];
 
 const occupied = (x, y, self) => actors.some((a) => a !== self && ((a.x === x && a.y === y) || (a.from && a.from.x === x && a.from.y === y)));
-const canEnter = (x, y, self) => x >= 0 && y >= 0 && x < W && y < H && G.walkable[at(x, y)] && !occupied(x, y, self);
+const canEnter = (x, y, self) => walkable(x, y) && !occupied(x, y, self);
 function startStep(a, dir) {
   const [dx, dy] = steps[dir];
   a.facing = dir;
-  if (!canEnter(a.x + dx, a.y + dy, a)) return false;
+  let to = null;
+  // A ledge facing this way: hop over it to the cell beyond.
+  if (behaviorAt(a.x + dx, a.y + dy) === jumpBehavior[dir] && canEnter(a.x + 2 * dx, a.y + 2 * dy, a)) to = { x: a.x + 2 * dx, y: a.y + 2 * dy, jump: true };
+  else if (canEnter(a.x + dx, a.y + dy, a)) to = { x: a.x + dx, y: a.y + dy, jump: false };
+  if (!to) return false;
   a.from = { x: a.x, y: a.y };
-  a.x += dx; a.y += dy; a.t = 0;
+  a.x = to.x; a.y = to.y; a.t = 0; a.jump = to.jump;
   a.parity ^= 1; // alternate feet each step
   return true;
 }
@@ -290,14 +319,15 @@ function spriteScale(a, pitchDeg) {
   return [cols, len];
 }
 
-/** Where an actor is between cells: tile coords of its cell's top-left, and its height. */
+/** Where an actor is between cells (world tiles, cell top-left), its ground height and hop height. */
 function actorPos(a) {
   const k = a.from ? Math.min(a.t, 1) : 1;
   const fx = a.from ? a.from.x : a.x, fy = a.from ? a.from.y : a.y;
-  const h0 = G.height[at(fx, fy)], h1 = G.height[at(a.x, a.y)];
-  return { x: fx + (a.x - fx) * k, y: fy + (a.y - fy) * k, h: h0 + (h1 - h0) * k };
+  const h0 = heightAt(fx, fy), h1 = heightAt(a.x, a.y);
+  const lift = a.from && a.jump ? 4 * k * (1 - k) * JUMP_HEIGHT : 0;
+  return { x: fx + (a.x - fx) * k, y: fy + (a.y - fy) * k, h: h0 + (h1 - h0) * k, lift };
 }
-const actorFrame = (a) => (a.from && a.t < 0.5 ? walkFrames[a.facing][a.parity] : standFrame[a.facing]);
+const actorFrame = (a) => (a.from && (a.jump || a.t < 0.5) ? walkFrames[a.facing][a.parity] : standFrame[a.facing]);
 
 function placeActor(a, camPos, pitchDeg) {
   const p = actorPos(a);
@@ -306,6 +336,7 @@ function placeActor(a, camPos, pitchDeg) {
   const off = BB.feetOffset ?? 0;
   a.root.position.set(x + Math.sin(yaw) * off, p.h, z + Math.cos(yaw) * off);
   a.root.rotation.y = yaw;
+  a.tilt.position.y = p.lift; // the shadow stays on the ground
   if (!a.sprite) return;
   a.tilt.rotation.x = (-BB.lean * Math.PI) / 180;
   const [sx, sy] = spriteScale(a, pitchDeg);
@@ -316,45 +347,53 @@ function placeActor(a, camPos, pitchDeg) {
 // ---- the original FireRed view: a 240x160 GBA screen drawn from the same state ----
 const gba = $('gba'), gctx = gba.getContext('2d');
 gba.width = 240; gba.height = 160;
-const atlasImg = tex.image, O = MAP.original;
-const blitAtlas = ([u0, v0], sx, sy, w, h, dx, dy) => gctx.drawImage(atlasImg, u0 + sx, v0 + sy, w, h, dx, dy, w, h);
 function drawGba() {
   gctx.imageSmoothingEnabled = false;
   const pp = actorPos(player);
   // FireRed keeps the player's cell at column 7, row 4 of the 15x10 screen.
   const ox = Math.round(pp.x * 16) - 112, oy = Math.round(pp.y * 16) - 64;
-  // Off the map edge the GBA repeats the layout's border blocks.
-  const bw = (O.border[2] - O.border[0]) / 16, bh = (O.border[3] - O.border[1]) / 16;
+  // Where no map is loaded, the GBA repeats the current map's border blocks.
+  const here = locate(player.x, player.y)?.m ?? home, B = here.D.original.border;
+  const bw = (B[2] - B[0]) / 16, bh = (B[3] - B[1]) / 16;
   for (let ty = Math.floor(oy / 16); ty * 16 < oy + 160; ty++)
     for (let tx = Math.floor(ox / 16); tx * 16 < ox + 240; tx++) {
-      if (tx >= 0 && ty >= 0 && tx < W && ty < H) continue;
-      const bx = ((tx % bw) + bw) % bw, by = ((ty % bh) + bh) % bh;
-      blitAtlas(O.border, bx * 16, by * 16, 16, 16, tx * 16 - ox, ty * 16 - oy);
+      if (locate(tx, ty)) continue;
+      const bx = (((tx - here.ox) % bw) + bw) % bw, by = (((ty - here.oy) % bh) + bh) % bh;
+      gctx.drawImage(here.img, B[0] + bx * 16, B[1] + by * 16, 16, 16, tx * 16 - ox, ty * 16 - oy, 16, 16);
     }
-  gctx.drawImage(atlasImg, O.below[0], O.below[1], W * 16, H * 16, -ox, -oy, W * 16, H * 16);
+  const layer = (key) => {
+    for (const m of maps) {
+      const [u0, v0] = m.D.original[key];
+      gctx.drawImage(m.img, u0, v0, m.W * 16, m.H * 16, m.ox * 16 - ox, m.oy * 16 - oy, m.W * 16, m.H * 16);
+    }
+  };
+  layer('below');
   // Sprites, back to front; feet on the bottom of their cell.
   for (const a of [...actors].sort((p, q) => actorPos(p).y - actorPos(q).y)) {
     if (!a.s) continue;
     const p = actorPos(a);
     const [u0, v0] = a.s.frames[actorFrame(a)];
-    const dx = Math.round(p.x * 16) - ox + (16 - a.s.width) / 2, dy = Math.round(p.y * 16) - oy + 16 - a.s.height;
+    const dx = Math.round(p.x * 16) - ox + (16 - a.s.width) / 2;
+    const dy = Math.round((p.y - p.lift) * 16) - oy + 16 - a.s.height;
     gctx.save();
     if (a.facing === 'right') { gctx.translate(dx + a.s.width, dy); gctx.scale(-1, 1); } else gctx.translate(dx, dy);
-    gctx.drawImage(atlasImg, u0, v0, a.s.width, a.s.height, 0, 0, a.s.width, a.s.height);
+    gctx.drawImage(a.m.img, u0, v0, a.s.width, a.s.height, 0, 0, a.s.width, a.s.height);
     gctx.restore();
   }
-  gctx.drawImage(atlasImg, O.above[0], O.above[1], W * 16, H * 16, -ox, -oy, W * 16, H * 16);
+  layer('above');
 }
 
 let lastCell = '';
 function readout() {
-  const i = at(player.x, player.y), cellKey = `${player.x},${player.y},${player.facing}`;
-  if (cellKey === lastCell) return;
-  lastCell = cellKey;
-  $('rCell').textContent = `${player.x}, ${player.y}  (elevation ${G.elevation[i]}, facing ${player.facing})`;
-  $('rClass').textContent = G.class[i];
-  $('rBehavior').textContent = G.behavior[i];
-  $('rHeight').textContent = G.height[i];
+  const c = locate(player.x, player.y);
+  const key = `${player.x},${player.y},${player.facing}`;
+  if (!c || key === lastCell) return;
+  lastCell = key;
+  $('title').textContent = pretty(c.m.D.name);
+  $('rCell').textContent = `${c.x}, ${c.y}  (elevation ${c.m.G.elevation[c.i]}, facing ${player.facing})`;
+  $('rClass').textContent = c.m.G.class[c.i];
+  $('rBehavior').textContent = c.m.G.behavior[c.i];
+  $('rHeight').textContent = c.m.G.height[c.i];
 }
 
 // NPC movement types: FACE_* stand still, WANDER_* roam inside their range, LOOK_AROUND turns.
@@ -363,17 +402,17 @@ function updateNpc(a, dt) {
   a.wait -= dt;
   if (a.wait > 0) return;
   a.wait = 1 + Math.random() * 3;
-  const m = a.movement;
+  const mv = a.movement;
   let dirs = null;
-  if (m === 'MOVEMENT_TYPE_WANDER_AROUND') dirs = ['up', 'down', 'left', 'right'];
-  else if (m === 'MOVEMENT_TYPE_WANDER_UP_AND_DOWN') dirs = ['up', 'down'];
-  else if (m === 'MOVEMENT_TYPE_WANDER_LEFT_AND_RIGHT') dirs = ['left', 'right'];
-  if (m === 'MOVEMENT_TYPE_LOOK_AROUND') { a.facing = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)]; return; }
+  if (mv === 'MOVEMENT_TYPE_WANDER_AROUND') dirs = ['up', 'down', 'left', 'right'];
+  else if (mv === 'MOVEMENT_TYPE_WANDER_UP_AND_DOWN') dirs = ['up', 'down'];
+  else if (mv === 'MOVEMENT_TYPE_WANDER_LEFT_AND_RIGHT') dirs = ['left', 'right'];
+  if (mv === 'MOVEMENT_TYPE_LOOK_AROUND') { a.facing = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)]; return; }
   if (!dirs) return;
   const dir = dirs[Math.floor(Math.random() * dirs.length)];
   const [dx, dy] = steps[dir];
   const nx = a.x + dx - a.home.x, ny = a.y + dy - a.home.y;
-  if (Math.abs(nx) > a.range[0] || Math.abs(ny) > a.range[1]) { a.facing = dir; return; }
+  if (Math.abs(nx) > a.range[0] || Math.abs(ny) > a.range[1] || behaviorAt(a.x + dx, a.y + dy)?.startsWith('MB_JUMP')) { a.facing = dir; return; }
   startStep(a, dir);
 }
 
@@ -408,10 +447,11 @@ function playerInput(dt) {
 canvas.addEventListener('pointerdown', () => canvas.focus());
 
 // ---- camera ----
-const cam = new THREE.PerspectiveCamera(MAP.camera.fov, 1, 0.1, 500);
+const CAM = home.D.camera;
+const cam = new THREE.PerspectiveCamera(CAM.fov, 1, 0.1, 500);
 const orbit = new OrbitControls(cam, canvas);
 orbit.enabled = false;
-const baked = { pitch: MAP.camera.pitch, fov: MAP.camera.fov, view: MAP.camera.view };
+const baked = { pitch: CAM.pitch, fov: CAM.fov, view: CAM.view };
 const settings = { ...baked };
 const syncSliders = () => {
   for (const k of ['pitch', 'fov', 'view']) { $(k).value = settings[k]; $(k + 'Out').textContent = settings[k]; }
@@ -422,7 +462,7 @@ for (const k of ['pitch', 'fov', 'view']) {
 syncSliders();
 $('reset').onclick = () => { Object.assign(settings, baked); syncSliders(); };
 $('copy').onclick = () => {
-  const line = `  ${MAP.camera.preset}: { pitch: ${settings.pitch}, fov: ${settings.fov}, view: ${settings.view} }`;
+  const line = `  ${CAM.preset}: { pitch: ${settings.pitch}, fov: ${settings.fov}, view: ${settings.view} }`;
   const showFallback = () => { const y = $('yaml'); y.value = line.trim(); y.hidden = false; y.select(); $('copied').textContent = 'Select and copy this line'; };
   try {
     navigator.clipboard.writeText(line).then(() => { $('copied').textContent = 'Copied'; $('yaml').hidden = true; }, showFallback);
@@ -433,12 +473,15 @@ $('orbit').onchange = () => {
   if (orbit.enabled) { orbit.target.copy(player.root.position); orbit.update(); }
 };
 $('shade').onchange = () => {
-  const m = $('shade').checked ? mats.lit : mats.flat;
-  opaque.material = m[0]; cutout.material = m[1];
+  const key = $('shade').checked ? 'lit' : 'flat';
+  for (const m of maps) { m.opaque.material = m.mats[key][0]; m.cutout.material = m.mats[key][1]; }
 };
 // Small screens start with the panel folded so the map is visible.
 if (matchMedia('(max-width: 600px)').matches) $('panel').open = false;
 
+// In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows.
+const GBA_ROWS = 10;
+const comparing = () => document.body.classList.contains('compare');
 function followCamera() {
   cam.fov = settings.fov;
   const view = comparing() ? GBA_ROWS : settings.view;
@@ -449,9 +492,6 @@ function followCamera() {
   cam.lookAt(t);
   cam.updateProjectionMatrix();
 }
-// In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows.
-const GBA_ROWS = 10;
-const comparing = () => document.body.classList.contains('compare');
 function resize() {
   if (comparing()) {
     const portrait = innerWidth <= innerHeight;
@@ -478,14 +518,16 @@ function setCompare(on) {
   if (on) $('panel').open = false;
   resize();
 }
-$('compareBtn').onclick = () => setCompare(!document.body.classList.contains('compare'));
+$('compareBtn').onclick = () => setCompare(!comparing());
 setCompare(location.hash === '#compare');
 
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min((now - last) / 1000, 0.1); last = now;
   for (const a of actors) {
-    if (a.from) { a.t += dt / BB.stepSeconds; if (a.t >= 1) { a.from = null; a.t = 1; } }
+    if (!a.from) continue;
+    a.t += dt / (BB.stepSeconds * (a.jump ? 2 : 1));
+    if (a.t >= 1) { a.from = null; a.t = 1; a.jump = false; }
   }
   if (!player.from) playerInput(dt);
   for (const a of npcs) updateNpc(a, dt);

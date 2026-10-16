@@ -17,7 +17,8 @@ git and is regenerated locally.
 npm install
 npm run setup:decomp              # once: clones pret/pokefirered into vendor/
 npm run classify -- PalletTown    # classify + debug overlays
-npm run bake -- PalletTown        # bake to the runtime format + 3D preview
+npm run bake -- PalletTown Route1  # bake maps + a connected 3D preview
+npm run serve                     # preview at http://localhost:5179 (large bakes won't open from disk)
 ```
 
 Outputs:
@@ -26,7 +27,7 @@ Outputs:
 - `build/debug/classify.html`: map and tileset views; hover a cell to see why it got its class
 - `build/debug/maps/*_classes.png`, `build/debug/tilesets/*_classes.png`: the same overlays as images
 - `build/maps/<Map>/map.json` + `atlas.png`: the baked map (format below)
-- `build/debug/view3d.html`: 3D preview of the last baked map. Walk with WASD and tune the camera live.
+- `build/debug/view3d.html`: 3D preview of every map in the bake, laid out by their connections with the first map at the origin. Walk with WASD across map edges, hop ledges, tune the camera, and compare against the original GBA view.
 
 ## How a metatile gets its class
 
@@ -79,7 +80,10 @@ player in the walk-behind row just like on the GBA.
 - **Cutouts:** pixels identical to the nearest plain ground tile are made
   transparent. The grass behind a fence disappears, while a forest stays solid.
 - **Ground under** anything that stood up is replaced with the nearest plain
-  ground, or a shaded copy (`ground: shade`, used for forest floor).
+  ground, a shaded copy (`ground: shade`, used for forest floor), or left as
+  the original art (`ground: keep`, used for ledges).
+- **Walkable objects** (`walkable: true`) stand up over cells the player can
+  enter. Tall grass uses this: short leaning tufts the player wades into.
 
 ## Baked map format (`build/maps/<Map>/map.json`)
 
@@ -115,6 +119,7 @@ generated from the same data.
 | Animation tagging | **done** | Ranges read from `src/tileset_anims.c` |
 | Height | **done** | Cliffs on routes will need real elevation changes to test |
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
+| Map connections | **done** | Maps placed by their connection offsets; walk across edges |
 | Prop grouping | partly | Buildings are grouped; objects are per-column chunks so far |
 | Billboards | **done** | Real overworld sprites from the decomp, yaw-only, screen-size matched, shadows, hidden flags (`billboards.yaml`) |
 | Materials and colour | later | Per-class shading, palette grading, water shader |
