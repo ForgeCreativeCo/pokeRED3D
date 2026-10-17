@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
-import { assertDecomp, readMap, readLayout, mapNameById, newGame } from './lib/decomp.js';
+import { DECOMP_DIR, assertDecomp, readMap, readLayout, mapNameById, newGame } from './lib/decomp.js';
 import { loadRules } from './lib/rules.js';
 import { classifyTilesets } from './lib/classify.js';
 import { bakeMap } from './lib/bake.js';
@@ -19,6 +19,7 @@ import { bakeSong } from './lib/music.js';
 import { bakeScripts } from './lib/scripts.js';
 import { bakePokemon } from './lib/pokemon.js';
 import { bakeItems, uiText, nationalDex } from './lib/items.js';
+import { bakeTypes, bakeWild, bakeTrainers, bakePlayerPics, bakeTerrains } from './lib/battle.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const OUT = path.join(ROOT, 'build');
@@ -104,10 +105,29 @@ const roots = world.flatMap((w) => [
 const scripts = { ...bakeScripts(roots), startFlags: [...newGame().hiddenFlags] };
 console.log(`Scripts: ${Object.keys(scripts.scripts).length} scripts, ${Object.keys(scripts.text).length} texts`);
 
-// Music: every song the maps play, plus any a script switches to, with the samples they share.
+// Battles: the type chart, the maps' wild Pokémon, every trainer the scripts
+// can battle, the trainers' and player's pictures, and the backgrounds.
+const trainerIds = Object.values(scripts.scripts).flat().filter(([cmd]) => cmd.startsWith('trainerbattle')).map(([, id]) => id);
+const { trainers, pics: trainerPics } = bakeTrainers(trainerIds);
+const wild = bakeWild(world.map((w) => w.data.id));
+// Every background BattleSetup_GetTerrainId can pick, short of the sea floor.
+const terrains = bakeTerrains(['GRASS', 'LONG_GRASS', 'SAND', 'WATER', 'POND', 'MOUNTAIN', 'CAVE', 'BUILDING', 'PLAIN'].map((t) => `BATTLE_TERRAIN_${t}`));
+const battle = {
+  format: { name: 'pokered3d-battle', version: 1 },
+  types: bakeTypes(), wild, trainers, trainerPics, playerPics: bakePlayerPics(), terrains,
+  // Wild battles: GetBattleBGM, Cmd_getexp's victory, and catching (battle_anim_special.c, sText_GotchaPkmnCaught).
+  music: { wild: 'MUS_VS_WILD', wildVictory: 'MUS_VICTORY_WILD', caughtIntro: 'MUS_CAUGHT_INTRO', caught: 'MUS_CAUGHT' },
+};
+// trainerbattle_earlyrival's flags (RIVAL_BATTLE_TUTORIAL, …), for the script player.
+for (const [, k, v] of fs.readFileSync(path.join(DECOMP_DIR, 'include/constants/battle.h'), 'utf8').matchAll(/#define\s+(RIVAL_BATTLE_\w+)\s+(\d+)/g)) scripts.consts[k] = v;
+const battleSongs = [...Object.values(battle.music), ...Object.values(trainers).flatMap((t) => Object.values(t.music))];
+console.log(`Battle: ${battle.types.chart.length} type matchups; wild Pokémon on ${Object.keys(wild.maps).join(', ') || 'no maps'}; trainers ${Object.keys(trainers).join(', ') || 'none'}`);
+
+// Music: every song the maps play, plus any a script switches to, plus the
+// battle songs, with the samples they share.
 const scriptSongs = Object.values(scripts.scripts).flat().filter(([cmd]) => cmd === 'playbgm' || cmd === 'savebgm').map(([, mus]) => mus);
 const music = { songs: {}, samples: {}, waves: {} };
-for (const m of new Set([...world.map((w) => w.data.music), ...scriptSongs])) {
+for (const m of new Set([...world.map((w) => w.data.music), ...scriptSongs, ...battleSongs])) {
   const r = m && m !== 'MUS_DUMMY' && bakeSong(m);
   if (!r) { if (m && m !== 'MUS_DUMMY') console.warn(`  no song data for ${m}`); continue; }
   music.songs[m] = r.song;
@@ -117,8 +137,11 @@ for (const m of new Set([...world.map((w) => w.data.music), ...scriptSongs])) {
 console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.samples).length} samples)`);
 
 // Pokémon: every species and move as data; pictures for each species the
-// scripts mention (the starters, and any Pokémon a scene shows or gives).
+// scripts mention (the starters, and any Pokémon a scene shows or gives),
+// that lives wild on the baked maps, or that a baked trainer sends out.
 const named = new Set(Object.values(scripts.scripts).flat().flat().filter((a) => /^SPECIES_\w+$/.test(a) && a !== 'SPECIES_EGG' && a !== 'SPECIES_NONE'));
+for (const tables of Object.values(wild.maps)) for (const t of Object.values(tables)) for (const m of t.mons) named.add(m.species);
+for (const t of Object.values(trainers)) for (const m of t.party) named.add(m.species);
 const pokemon = bakePokemon([...named]);
 const dex = nationalDex();
 for (const [s, sp] of Object.entries(pokemon.species)) sp.dex = dex[s] ?? 0;
@@ -134,7 +157,7 @@ console.log(`Items: ${Object.keys(items.items).length}; a new game starts with $
 console.log(`Pokémon: ${Object.keys(pokemon.species).length} species, ${Object.keys(pokemon.moves).length} moves; pictures of ${Object.keys(pokemon.pics).join(', ') || 'none'}`);
 
 // The game loads these as files: the world's layout and start, the scripts,
-// the music and the Pokémon. Each map's map.json and atlas.png are fetched by name.
+// the music, the Pokémon, the items and the battle data. Each map's map.json and atlas.png are fetched by name.
 const DATA = path.join(OUT, 'data');
 fs.mkdirSync(DATA, { recursive: true });
 const layout = world.map(({ area, ox, oy, data }) => ({ map: data.name, area, ox, oy }));
@@ -143,4 +166,5 @@ fs.writeFileSync(path.join(DATA, 'scripts.json'), JSON.stringify(scripts));
 fs.writeFileSync(path.join(DATA, 'music.json'), JSON.stringify(music));
 fs.writeFileSync(path.join(DATA, 'pokemon.json'), JSON.stringify(pokemon));
 fs.writeFileSync(path.join(DATA, 'items.json'), JSON.stringify(items));
-console.log(`\nGame data: build/data/ (world, scripts, music, pokemon, items)`);
+fs.writeFileSync(path.join(DATA, 'battle.json'), JSON.stringify(battle));
+console.log(`\nGame data: build/data/ (world, scripts, music, pokemon, items, battle)`);

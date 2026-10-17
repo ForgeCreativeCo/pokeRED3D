@@ -31,6 +31,7 @@ Outputs:
 - `build/data/scripts.json`, `build/data/music.json`: the scripts and text, and the songs with their samples (see below)
 - `build/data/pokemon.json`: every species and move, the natures and ability names, and pictures of the Pokémon the scripts mention (see below)
 - `build/data/items.json`: every item (name, price, pocket, description) and the money a new game starts with
+- `build/data/battle.json`: the type chart, the baked maps' wild Pokémon, every trainer the scripts can battle, trainer and player pictures, and the battle backgrounds (see below)
 
 The game (`src/`, `npm run dev`) loads these. Walk with WASD, hop ledges,
 tune the camera from the panel, and compare against the original GBA view.
@@ -133,6 +134,10 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 //                 "moves": { MOVE_…: { name, type, power, accuracy, pp, … } }, "natures", "abilities",
 //                 "pics": { SPECIES_…: { front, back, icon } } }   // PNG data URIs
 // items.json:   { "items": { ITEM_…: { name, price, pocket, description, param, fieldUse, important } }, "startMoney" }
+// battle.json:  { "types": { "chart": [[attacker, defender, x10]], "foresight", "names" },
+//                 "wild": { "slotRates", "rodGroups", "maps": { MAP_…: { land, water, rockSmash, fishing } } },
+//                 "trainers": { TRAINER_…: { name, class, className, double, party, money, pic, music, … } },
+//                 "trainerPics", "playerPics", "terrains": { BATTLE_TERRAIN_…: PNG data URI }, "music" }
 ```
 
 `src/data/types.ts` types every one of these files.
@@ -150,6 +155,7 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 | Items | **done** | Items from `src/data/items.json`; the menus' own lines from the decomp's text (`tools/baker/lib/items.js`) |
 | Pokémon | **done** | Species, moves, natures and pictures from the decomp (`tools/baker/lib/pokemon.js`) |
 | Music | **done** | Map songs from the decomp's MIDI, voicegroups and samples |
+| Battle data | **done** | Type chart, wild tables, trainers, pictures, backgrounds and battle songs (`tools/baker/lib/battle.js`); the battles themselves are next |
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
 | Map connections | **done** | Maps placed by their connection offsets; walk across edges |
 | Prop grouping | partly | Buildings are grouped; objects are per-column chunks so far |
@@ -172,7 +178,8 @@ abilities, growth rate, gender ratio), names, level-up learnsets, every move,
 the natures and their stat table straight from the decomp. All 411 species
 and 354 moves are baked as data. Pictures (front, back and the two-frame party
 icon, in each species' own palette) are baked only for the species the baked
-scripts mention, so far the three starters; wild encounters will add theirs.
+scripts mention (the three starters), that live wild on the baked maps, or
+that a baked trainer sends out.
 
 The game creates Pokémon with FireRed's own formulas (`src/pokemon/mon.ts`):
 a 32-bit personality decides nature, gender and ability; IVs come from two
@@ -189,6 +196,37 @@ menus say (the save dialogue, Oak telling you it isn't the time to use an
 item, the toss question) is FireRed's own text, read by label from
 `data/text/*.inc` and `src/strings.c` and merged into `scripts.json`, so the
 text box shows it exactly as it shows script text.
+
+## Battle data
+
+`tools/baker/lib/battle.js` bakes what battles will need, all parsed from
+the decomp:
+
+- **Types:** `gTypeEffectiveness` as FireRed lists it, multipliers x10 (0,
+  5, 20; pairs not listed are 10). The entries after the Foresight separator
+  (Normal and Fighting on Ghost) are kept apart, as they stop applying once
+  Foresight is used. Type names come from `gTypeNames`.
+- **Wild Pokémon:** each baked map's FireRed table from
+  `src/data/wild_encounters.json` (the LeafGreen ones are skipped): land,
+  water, Rock Smash and fishing, each with the map's rate and its slots, plus
+  the slot weights and which fishing slots each rod uses.
+- **Trainers:** every trainer a baked script's `trainerbattle_*` names, from
+  `src/data/trainers.h` and `trainer_parties.h`: class and its name,
+  party (level, IVs, held item and moves where the decomp gives them), items,
+  AI flags, the prize-money factor (`gTrainerMoneyTable`), and the music for
+  being spotted, the battle and the win, read from the switches in
+  `PlayTrainerEncounterMusic`, `GetBattleBGM` and the victory code. The
+  rival's name is the decomp's placeholder; the game shows the rival's name.
+- **Pictures:** each baked trainer's front picture with its palette and
+  vertical offset, and the player's back pictures (Red and Leaf, five 64x64
+  frames each). Pokémon pictures cover the wild and trainer Pokémon too.
+- **Backgrounds:** every terrain `BattleSetup_GetTerrainId` can pick
+  (except underwater), drawn from `sBattleTerrainTable`'s tiles, tilemap
+  and palette into the 240x112 scene above the text box. Colour 0 is left
+  transparent, as on the GBA.
+- **Songs:** wild and trainer battle themes, victory themes and the catch
+  fanfare are added to `music.json`. `scripts.json` gains the
+  `RIVAL_BATTLE_*` flags `trainerbattle_earlyrival` takes.
 
 ## Music
 

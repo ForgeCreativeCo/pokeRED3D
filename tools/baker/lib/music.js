@@ -41,7 +41,8 @@ function loadBanks() {
 
   const symbolFile = (incFile, prefix) => {
     const map = new Map();
-    for (const [, sym, file] of text(incFile).matchAll(new RegExp(`(${prefix}\\w+)::\\s*\\n\\s*\\.incbin "([^"]+)"`, 'g'))) map.set(sym, file);
+    // A label can carry an @ comment (the tuba samples do).
+    for (const [, sym, file] of text(incFile).matchAll(new RegExp(`(${prefix}\\w+)::[^\\n]*\\n\\s*\\.incbin "([^"]+)"`, 'g'))) map.set(sym, file);
     return map;
   };
   banks = {
@@ -204,7 +205,10 @@ export function bakeSong(musConst) {
       voiceIndex.set(key, voices.length);
       voices.push(v);
       // The .incbin points at a build output; the source .wav sits beside it.
-      if (v.type === 'sample' && !samples[v.sample]) samples[v.sample] = readSample(sampleFiles.get(v.sample).replace(/\.bin$/, '.wav'));
+      if (v.type === 'sample' && !samples[v.sample]) {
+        if (!sampleFiles.has(v.sample)) throw new Error(`${musConst}: no sample ${v.sample} in sound/direct_sound_data.inc`);
+        samples[v.sample] = readSample(sampleFiles.get(v.sample).replace(/\.bin$/, '.wav'));
+      }
       if (v.type === 'wave' && !waves[v.wave]) waves[v.wave] = readWave(waveFiles.get(v.wave));
     }
     return voiceIndex.get(key);

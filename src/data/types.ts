@@ -99,6 +99,10 @@ export interface MapFile {
   width: number;
   height: number;
   indoor: boolean;
+  /** MAP_TYPE_ROUTE, MAP_TYPE_INDOOR, … */
+  mapType: string;
+  /** MAP_BATTLE_SCENE_NORMAL, …: with the tile underfoot, picks the battle background */
+  battleScene: string;
   music: string;
   camera: CameraPreset;
   /** row-major, width * height */
@@ -251,4 +255,81 @@ export interface ItemsFile {
   items: Record<string, ItemData>;
   /** what a new game starts with */
   startMoney: number;
+}
+
+// ---- Battles (build/data/battle.json) ----
+
+/** One wild slot: a species and its level range */
+export interface WildMon {
+  species: string;
+  min: number;
+  max: number;
+}
+
+export interface WildTable {
+  /** the map's encounter rate for this kind */
+  rate: number;
+  mons: WildMon[];
+}
+
+export type WildKind = 'land' | 'water' | 'rockSmash' | 'fishing';
+
+/** One Pokémon of a trainer's party. Without moves, it knows the last four it learned by its level. */
+export interface TrainerMon {
+  iv: number;
+  level: number;
+  species: string;
+  item?: string;
+  moves?: string[];
+}
+
+export interface Trainer {
+  /** as the decomp writes it; the rival's is replaced by the rival's name in game */
+  name: string;
+  /** TRAINER_CLASS_…, and its name (YOUNGSTER, RIVAL, …) */
+  class: string;
+  className: string;
+  female: boolean;
+  double: boolean;
+  /** items the trainer can use in battle */
+  items: string[];
+  /** AI_SCRIPT_… flags */
+  ai: string[];
+  party: TrainerMon[];
+  /** prize money: 4 x the last Pokémon's level x this */
+  money: number;
+  /** TRAINER_PIC_…, a key of trainerPics */
+  pic: string;
+  /** songs for being spotted, the battle and winning it */
+  music: { encounter: string; battle: string; victory: string };
+}
+
+export interface BattleFile {
+  format: { name: 'pokered3d-battle'; version: 1 };
+  types: {
+    /** [attacking type, defending type, multiplier x10]: 0, 5 or 20; pairs not listed are 10 */
+    chart: [string, string, number][];
+    /** entries that apply only until Foresight is used (Normal and Fighting on Ghost) */
+    foresight: [string, string, number][];
+    /** TYPE_… -> NORMAL, FIGHT, … */
+    names: Record<string, string>;
+  };
+  wild: {
+    /** weights of each slot, by kind (land: 20, 20, 10, …) */
+    slotRates: Record<WildKind, number[]>;
+    /** fishing slots per rod */
+    rodGroups: Record<string, number[]>;
+    /** by map id (MAP_ROUTE1), FireRed's tables */
+    maps: Record<string, Partial<Record<WildKind, WildTable>>>;
+  };
+  /** every trainer the baked scripts can battle, by TRAINER_… */
+  trainers: Record<string, Trainer>;
+  /** front pictures, 64x64 PNG data URIs, and how far down the frame they sit */
+  trainerPics: Record<string, { pic: string; y: number }>;
+  /** the player's back pictures (RED, LEAF): 64x64 frames stacked top to bottom */
+  playerPics: Record<string, { pic: string; frames: number }>;
+  /** BATTLE_TERRAIN_… -> the scene above the text box, 240x112 PNG data URI (colour 0 transparent) */
+  terrains: Record<string, string>;
+  /** songs for wild battles */
+  music: { wild: string; wildVictory: string; caughtIntro: string; caught: string };
 }

@@ -7,7 +7,7 @@ const BUILD = path.resolve(import.meta.dirname, 'build');
 
 /**
  * virtual:baked-data: in the single-file build, every baked file the game
- * loads (world, scripts, music, Pokémon, items, each map and its atlas) embedded in the page;
+ * loads (world, scripts, music, Pokémon, items, battle, each map and its atlas) embedded in the page;
  * otherwise null, and the game fetches them from build/.
  */
 function bakedData(embed: boolean): Plugin {
@@ -25,7 +25,7 @@ function bakedData(embed: boolean): Plugin {
         const data = JSON.parse(read(`maps/${map}/map.json`).toString());
         maps[map] = { data, atlas: `data:image/png;base64,${read(`maps/${map}/${data.atlas.file}`).toString('base64')}` };
       }
-      return `export default ${JSON.stringify({ world, maps, scripts: JSON.parse(read('data/scripts.json').toString()), music: JSON.parse(read('data/music.json').toString()), pokemon: JSON.parse(read('data/pokemon.json').toString()), items: JSON.parse(read('data/items.json').toString()) })};`;
+      return `export default ${JSON.stringify({ world, maps, scripts: JSON.parse(read('data/scripts.json').toString()), music: JSON.parse(read('data/music.json').toString()), pokemon: JSON.parse(read('data/pokemon.json').toString()), items: JSON.parse(read('data/items.json').toString()), battle: JSON.parse(read('data/battle.json').toString()) })};`;
     },
   };
 }

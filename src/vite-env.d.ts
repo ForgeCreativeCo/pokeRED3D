@@ -8,6 +8,7 @@ declare module 'virtual:baked-data' {
     music: import('./data/types').MusicFile;
     pokemon: import('./data/types').PokemonFile;
     items: import('./data/types').ItemsFile;
+    battle: import('./data/types').BattleFile;
     /** by folder name: the map and its atlas as a data URI */
     maps: Record<string, { data: import('./data/types').MapFile; atlas: string }>;
   } | null;

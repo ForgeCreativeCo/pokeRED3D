@@ -316,6 +316,9 @@ export function bakeMap(name, rules, lookup) {
       },
       connections: map.connections ?? [],
       indoor: map.map_type === 'MAP_TYPE_INDOOR',
+      /** MAP_TYPE_ROUTE, …, and MAP_BATTLE_SCENE_NORMAL, …: together with the tile you stand on they pick the battle background */
+      mapType: map.map_type,
+      battleScene: map.battle_scene,
       music: map.music,
       warps: (map.warp_events ?? []).map((w) => ({
         x: w.x, y: w.y, behavior: cells[idx(w.x, w.y)].e.behavior,

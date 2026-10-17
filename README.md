@@ -82,7 +82,7 @@ Other commands:
 | Command | What it does |
 |---|---|
 | `npm run classify -- <Map> …` | Classify a map's tiles and write debug overlays to `build/debug/` |
-| `npm run bake -- <Map> …` | Bake maps (plus their songs, scripts, Pokémon and items) into `build/` for the game to load |
+| `npm run bake -- <Map> …` | Bake maps (plus their songs, scripts, Pokémon, items and battle data) into `build/` for the game to load |
 | `npm run dev` | Run the game on http://localhost:5173, live-reloading as `src/` changes |
 | `npm run build` | Typecheck and build the game into `dist/`, with the baked data alongside |
 | `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
@@ -108,6 +108,7 @@ The rules, the baked format and every decision behind them are documented in
 | **Camera** | Outdoor and interior camera presets | `camera.yaml` |
 | **Music** | Each song's MIDI, voicegroup and samples, resolved to the voices FireRed would play | `tools/baker/lib/music.js` |
 | **Scripts** | Event scripts and text reachable from people, signs, triggers and map scripts | `tools/baker/lib/scripts.js` |
+| **Battle data** | Type chart, wild Pokémon, trainers and their parties, trainer pictures, battle backgrounds | `tools/baker/lib/battle.js` |
 
 The game itself is TypeScript and three.js in `src/`, built with Vite. It
 loads the baked files (`build/data/*.json` and each map's `map.json` and
@@ -216,7 +217,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
-| 5 | **Battles** | a. battle scene and UI · b. core mechanics ported from the decomp (damage, types, accuracy, status, experience) · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
+| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · a. battle scene and UI · b. core mechanics ported from the decomp (damage, types, accuracy, status, experience) · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track

@@ -19,7 +19,7 @@ import { DECOMP_DIR } from './decomp.js';
 const read = (file) => fs.readFileSync(path.join(DECOMP_DIR, file), 'utf8');
 
 /** [KEY] = { .field = value, ... } blocks of a C designated-initializer table. */
-function blocks(src, prefix) {
+export function blocks(src, prefix) {
   const out = new Map();
   // Split at each "[KEY] =" so a one-line entry ({0}) can't swallow the next one.
   const parts = src.split(new RegExp(`\\[(${prefix}\\w+)\\]\\s*=`));
@@ -103,12 +103,12 @@ function load() {
 
 // ---- pictures ----
 
-function readJascPal(file) {
+export function readJascPal(file) {
   return fs.readFileSync(path.join(DECOMP_DIR, file), 'utf8').trim().split(/\r?\n/).slice(3).map((l) => l.trim().split(/\s+/).map(Number));
 }
 
 /** An indexed PNG redrawn with the given palette; colour 0 transparent. Returns a PNG data URI. */
-function recolor(pngFile, palette) {
+export function recolor(pngFile, palette) {
   const png = PNG.sync.read(fs.readFileSync(path.join(DECOMP_DIR, pngFile)), { skipRescale: true });
   const lookup = new Map(png.palette.map((c, i) => [(c[0] << 16) | (c[1] << 8) | c[2], i]));
   const out = new PNG({ width: png.width, height: png.height });

@@ -12,7 +12,7 @@ export function makeMap(name: string, rows: string[], opts: { area?: number; ox?
   const cells = rows.join('').split('');
   const data: MapFile = {
     format: { name: 'pokered3d-map', version: 1 },
-    name, id: `MAP_${name.toUpperCase()}`, width, height, indoor: false, music: 'MUS_TEST',
+    name, id: `MAP_${name.toUpperCase()}`, width, height, indoor: false, mapType: 'MAP_TYPE_ROUTE', battleScene: 'MAP_BATTLE_SCENE_NORMAL', music: 'MUS_TEST',
     camera: { preset: 'default', pitch: 55, fov: 24, view: 11 },
     grid: {
       walkable: cells.map((c) => (c === '#' ? 0 : 1)),
