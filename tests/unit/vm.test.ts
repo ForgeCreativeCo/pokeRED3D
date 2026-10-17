@@ -5,7 +5,7 @@ import { Clock } from '../../src/core/clock';
 import { Input } from '../../src/input/input';
 import { World } from '../../src/world/world';
 import { makeActor } from '../../src/characters/actor';
-import type { Command, PokemonFile, ScriptsFile } from '../../src/data/types';
+import type { Command, ItemData, PokemonFile, ScriptsFile } from '../../src/data/types';
 import type { TextBox } from '../../src/ui/textbox';
 import type { Emote } from '../../src/ui/emote';
 import { makeMap } from './fixtures';
@@ -22,6 +22,8 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
     close() {}, hideChoice() {},
   } as unknown as TextBox;
   const pics: string[] = [];
+  const item = (name: string, pocket: ItemData['pocket'] = 'ITEMS'): ItemData => ({ name, price: 300, pocket, description: '', param: 20, fieldUse: null, important: pocket === 'KEY_ITEMS' });
+  const items = { ITEM_POTION: item('POTION'), ITEM_OAKS_PARCEL: item("OAK'S PARCEL", 'KEY_ITEMS') };
   const pokemon = {
     species: { SPECIES_BULBASAUR: { name: 'BULBASAUR', base: { hp: 45, atk: 49, def: 49, spe: 45, spa: 65, spd: 65 }, types: ['TYPE_GRASS'], abilities: ['ABILITY_OVERGROW'], growth: 'GROWTH_MEDIUM_SLOW', genderRatio: 31, catchRate: 45, expYield: 64, friendship: 70, learnset: [[1, 'MOVE_TACKLE']] } },
     moves: { MOVE_TACKLE: { name: 'TACKLE', type: 'TYPE_NORMAL', power: 35, accuracy: 95, pp: 35, effect: 'EFFECT_HIT', effectChance: 0, target: 'MOVE_TARGET_SELECTED', priority: 0, contact: true } },
@@ -30,12 +32,13 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
   const player = makeActor({ gfx: 'PLAYER', x: 2, y: 2 }, map);
   const npcs = map.data.objects.map((o) => makeActor(o, map));
   const host: ScriptHost = {
-    clock: new Clock(), input: new Input(), story: new Story(more.startFlags ?? []), world, textbox,
+    clock: new Clock(), input: new Input(), story: new Story(more.startFlags ?? [], 0, items, 3000), world, textbox,
     emote: { show: async () => {} } as unknown as Emote,
     music: { play: (n) => { played.push(n); } },
     player, npcs, areaActors: () => [player, ...npcs],
     warpTo: async () => {},
     pokemon,
+    items,
     monPic: { show: (s) => { pics.push(s); }, hide: () => { pics.push('hidden'); } },
   };
   const data: ScriptsFile = { scripts, text: {}, consts: {}, textColors: {}, startFlags: [], ...more };
@@ -172,6 +175,31 @@ describe('ScriptVM', () => {
     expect(t.host.story.vars.VAR_RESULT).toBe(0);
     expect(t.host.story.names.STR_VAR_1).toBe('BULBASAUR');
     expect(t.pics).toEqual(['SPECIES_BULBASAUR', 'hidden']); // the picture closes when the scene ends
+  });
+
+  it('fills and checks the Bag with the item commands', async () => {
+    const t = setup({ Main: [
+      ['checkitemspace', 'ITEM_POTION'],
+      ['copyvar', 'VAR_TEMP_1', 'VAR_RESULT'],
+      ['additem', 'ITEM_POTION', '2'],
+      ['checkitem', 'ITEM_POTION', '2'],
+      ['copyvar', 'VAR_TEMP_2', 'VAR_RESULT'],
+      ['removeitem', 'ITEM_POTION'],
+      ['giveitem', 'ITEM_OAKS_PARCEL'],
+      ['checkitem', 'ITEM_POTION', '2'],
+    ] });
+    await t.vm.run('Main', null);
+    const v = t.host.story.vars;
+    expect([v.VAR_TEMP_1, v.VAR_TEMP_2, v.VAR_RESULT]).toEqual([1, 1, 0]);
+    expect(t.host.story.bag.count('ITEM_POTION')).toBe(1);
+    expect(t.host.story.bag.count('ITEM_OAKS_PARCEL')).toBe(1);
+    expect(t.said).toContain("neutral: RED obtained a OAK'S PARCEL!");
+  });
+
+  it('marks the Pokédex when givemon gives one', async () => {
+    const t = setup({ Main: [['givemon', 'SPECIES_BULBASAUR', '5']] });
+    await t.vm.run('Main', null);
+    expect([...t.host.story.dex.caught]).toEqual(['SPECIES_BULBASAUR']);
   });
 
   it('stops giving at six', async () => {

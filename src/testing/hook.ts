@@ -42,9 +42,9 @@ export function installHook(game: Game) {
     },
     /** Start an event script by name, as if talking to no one in particular. */
     run(label: string) { game.vm.run(label, null); return hook.tick(0.1); },
-    /** Press A, B or a direction once (directions as a menu press), then let some game time pass. */
-    async press(button: 'a' | 'b' | Dir = 'a', seconds = 0.5) {
-      if (button === 'a' || button === 'b') input.buttons[`${button}Pressed`] = true;
+    /** Press A, B, START or a direction once (directions as a menu press), then let some game time pass. */
+    async press(button: 'a' | 'b' | 'start' | Dir = 'a', seconds = 0.5) {
+      if (button === 'a' || button === 'b' || button === 'start') input.buttons[`${button}Pressed`] = true;
       else input.pressDir(button);
       await hook.tick(seconds);
       return hook.text();
@@ -54,10 +54,15 @@ export function installHook(game: Game) {
     party() {
       return game.story.party.map((m) => `${displayName(game.pokemon, m)} Lv${m.level} ${m.hp}/${m.stats.hp} [${m.moves.map((x) => game.pokemon.moves[x.move]?.name ?? x.move).join(', ')}]`);
     },
-    /** Open the party screen (as its button does). */
+    /** Open the party screen from the start menu, in one go. */
     async openParty() { game.openParty(); await hook.tick(0.1); return hook.menu(); },
-    /** The party screen's state ('closed', 'party BULBASAUR', 'summary BULBASAUR: KNOWN MOVES', …). */
-    menu() { return game.partyMenu.state; },
+    /** Which menu is up: 'closed', 'title CONTINUE', 'start BAG', 'party BULBASAUR', 'bag ITEMS: POTION x1', … */
+    menu() { return game.title?.open ? game.title.state : game.startMenu.state; },
+    /** The Bag's contents, pocket by pocket. */
+    bag() {
+      return Object.entries(game.story.bag.pockets).flatMap(([p, stacks]) => stacks.map((s) => `${p} ${game.items[s.item]?.name ?? s.item} x${s.count}`));
+    },
+    get money() { return game.story.money; },
     /** The Pokémon showmonpic is showing ('' when none). */
     monPic() { return game.monPic.shown; },
     /** What the text box shows right now ('' when closed). */

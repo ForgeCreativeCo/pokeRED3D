@@ -200,6 +200,8 @@ export interface Species {
   friendship: number;
   /** [level, MOVE_…], in the order they're learned */
   learnset: [number, string][];
+  /** National Pokédex number (0 for none) */
+  dex: number;
 }
 
 export interface MoveData {
@@ -224,4 +226,29 @@ export interface PokemonFile {
   abilities: Record<string, string>;
   /** PNG data URIs, for the species the scripts mention: front and back 64x64, icon 32x64 (two frames) */
   pics: Record<string, { front: string; back: string; icon: string }>;
+}
+
+// ---- Items (build/data/items.json) ----
+
+/** The Bag's pockets, as the decomp names them (POCKET_ITEMS -> ITEMS). */
+export type Pocket = 'ITEMS' | 'KEY_ITEMS' | 'POKE_BALLS' | 'TM_CASE' | 'BERRY_POUCH';
+
+export interface ItemData {
+  name: string;
+  price: number;
+  pocket: Pocket;
+  /** FireRed text, with \n line breaks */
+  description: string;
+  /** for medicine, how much it restores */
+  param: number;
+  fieldUse: string | null;
+  /** key items: can't be tossed */
+  important: boolean;
+}
+
+export interface ItemsFile {
+  format: { name: 'pokered3d-items'; version: 1 };
+  items: Record<string, ItemData>;
+  /** what a new game starts with */
+  startMoney: number;
 }

@@ -5,18 +5,21 @@
 import type { Dir } from '../data/types';
 
 const keyDirs: Record<string, Dir> = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' };
-const aKeys = new Set(['z', 'enter', ' ', 'e']);
+const aKeys = new Set(['z', ' ', 'e']);
+/** START opens the start menu (Enter, as on most GBA keyboard layouts). */
+const startKeys = new Set(['enter']);
 const bKeys = new Set(['x', 'backspace', 'escape', 'q']);
 
 export class Input {
   /** held directions, most recent last */
   readonly held = new Set<Dir>();
-  readonly buttons = { a: false, b: false, aPressed: false, bPressed: false };
+  readonly buttons = { a: false, b: false, aPressed: false, bPressed: false, startPressed: false };
   /** the last direction pressed (not held), for menus */
   private dirPressed: Dir | null = null;
 
-  /** One menu press: a direction, A or B, each taken once. */
-  taken(): Dir | 'a' | 'b' | null {
+  /** One menu press: a direction, A, B or START, each taken once. */
+  taken(): Dir | 'a' | 'b' | 'start' | null {
+    if (this.buttons.startPressed) { this.buttons.startPressed = false; return 'start'; }
     if (this.buttons.aPressed) { this.buttons.aPressed = false; return 'a'; }
     if (this.buttons.bPressed) { this.buttons.bPressed = false; return 'b'; }
     const d = this.dirPressed;
@@ -52,12 +55,14 @@ export class Input {
       if ((e.target as Element | null)?.closest?.('input, button')) return;
       if (aKeys.has(k)) { if (!buttons.a) buttons.aPressed = true; buttons.a = true; e.preventDefault(); }
       if (bKeys.has(k)) { if (!buttons.b) buttons.bPressed = true; buttons.b = true; }
+      if (startKeys.has(k) && !e.repeat) { buttons.startPressed = true; e.preventDefault(); }
     });
     addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
       if (aKeys.has(k)) buttons.a = false;
       if (bKeys.has(k)) buttons.b = false;
     });
+    doc.getElementById('startBtn')!.addEventListener('pointerdown', (e) => { e.preventDefault(); buttons.startPressed = true; });
     const aBtn = doc.getElementById('aBtn')!;
     aBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); buttons.aPressed = true; buttons.a = true; aBtn.classList.add('held'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) aBtn.addEventListener(ev, () => { buttons.a = false; aBtn.classList.remove('held'); });

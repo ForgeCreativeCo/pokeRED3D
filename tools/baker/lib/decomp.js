@@ -233,7 +233,8 @@ export function tileAnimations() {
 let newGameCache;
 /**
  * What a fresh save looks like: the flags EventScript_ResetAllMapFlags sets
- * (objects hidden at the start), and where new_game.c drops the player.
+ * (objects hidden at the start), the money new_game.c gives, and where it
+ * drops the player.
  */
 export function newGame() {
   if (newGameCache) return newGameCache;
@@ -242,6 +243,7 @@ export function newGame() {
   const flags = [...body.matchAll(/setflag\s+(FLAG_\w+)/g)].map((m) => m[1]);
   const src = fs.readFileSync(decompPath('src/new_game.c'), 'utf8');
   const warp = src.match(/SetWarpDestination\(MAP_GROUP\((MAP_\w+)\),\s*MAP_NUM\(\1\),\s*-?\d+,\s*(\d+),\s*(\d+)\)/);
-  newGameCache = { hiddenFlags: new Set(flags), start: warp ? { map: mapNameById(warp[1]), x: Number(warp[2]), y: Number(warp[3]) } : null };
+  const money = Number(src.match(/SetMoney([^,]+,s*(d+))/)?.[1] ?? 3000);
+  newGameCache = { hiddenFlags: new Set(flags), money, start: warp ? { map: mapNameById(warp[1]), x: Number(warp[2]), y: Number(warp[3]) } : null };
   return newGameCache;
 }

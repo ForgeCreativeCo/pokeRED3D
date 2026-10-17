@@ -22,7 +22,10 @@ import { Panel, pretty } from './ui/panel';
 import { MonPic } from './ui/monPic';
 import { PartyMenu } from './ui/party';
 import { monRandom } from './core/random';
-import type { PokemonFile } from './data/types';
+import type { ItemData, PokemonFile } from './data/types';
+import { StartMenu } from './ui/startMenu';
+import { BagMenu, OptionsMenu, Pokedex, TitleScreen, TrainerCard } from './ui/screens';
+import { applySave, makeSave, readSave, writeSave, type SaveFile } from './save/save';
 
 /** In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows. */
 const GBA_ROWS = 10;
@@ -46,6 +49,13 @@ export class Game implements ScriptHost {
   readonly pokemon: PokemonFile;
   readonly monPic: MonPic;
   readonly partyMenu: PartyMenu;
+  readonly items: Record<string, ItemData>;
+  readonly startMenu: StartMenu;
+  /** shown at start-up when there's a save: CONTINUE or NEW GAME */
+  readonly title: TitleScreen | null;
+  /** a save from another game is in storage: the first save asks before overwriting it */
+  private otherSave = false;
+  private texts: Record<string, string>;
   readonly rig: CameraRig;
   readonly panel: Panel;
   /** a warp's fade is running */
@@ -83,10 +93,26 @@ export class Game implements ScriptHost {
     this.music = new Music(data.music);
     // A new save rolls the player's trainer ID (shown as the ID No. on their Pokémon).
     const trainerId = ((Math.floor(monRandom() * 0x10000) << 16) | Math.floor(monRandom() * 0x10000)) >>> 0;
-    this.story = new Story(data.scripts.startFlags, trainerId);
+    this.items = data.items.items;
+    this.texts = data.scripts.text;
+    this.story = new Story(data.scripts.startFlags, trainerId, data.items.items, data.items.startMoney);
     this.pokemon = data.pokemon;
     this.monPic = new MonPic(data.pokemon, doc);
     this.partyMenu = new PartyMenu(data.pokemon, this.story, this.input, doc);
+    const talk = (flow: () => Promise<void>) => { flow(); };
+    const bag = new BagMenu(this.input, doc, this.story, this.items, this.texts, talk, () => this.textbox);
+    this.startMenu = new StartMenu(this.story, this.input, doc, {
+      pokedex: new Pokedex(this.input, doc, this.story, data.pokemon),
+      party: this.partyMenu,
+      bag,
+      card: new TrainerCard(this.input, doc, this.story),
+      options: new OptionsMenu(this.input, doc, this.story, () => this.applyOptions()),
+      save: () => this.saveDialogue(),
+      talk,
+    });
+    const saved = readSave();
+    this.title = saved ? new TitleScreen(this.input, doc, saved, data.pokemon) : null;
+    this.title?.show();
     this.textbox = new TextBox(this.clock, this.input, this.story, doc);
     this.emote = new Emote(this.clock, doc);
     this.vm = new ScriptVM(data.scripts, this);
@@ -113,9 +139,6 @@ export class Game implements ScriptHost {
       musicBtn.setAttribute('aria-pressed', String(!this.music.muted));
     };
     $('compareBtn').onclick = () => this.setCompare(!this.comparing);
-    // Until the start menu exists: the party opens from its own button, or P.
-    $('partyBtn').onclick = () => this.openParty();
-    addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p' && !(e.target as Element | null)?.closest?.('input')) this.openParty(); });
     this.canvas.addEventListener('pointerdown', () => this.canvas.focus());
     addEventListener('resize', () => this.resize());
 
@@ -125,9 +148,62 @@ export class Game implements ScriptHost {
     this.setCompare(location.hash === '#compare');
   }
 
-  /** Open the party screen, when there's a party and nothing else is going on. */
+  /** Nothing else is going on: no scene, warp or step, and no menu open. */
+  private get idle() {
+    return !this.vm.running && !this.warping && !this.player.from && !this.startMenu.open && !this.title?.open;
+  }
+
+  /** Open the start menu, as START does. */
+  openStartMenu() {
+    if (this.idle) this.startMenu.show();
+  }
+
+  /** Open the party screen from the start menu (the test hook's shortcut). */
   openParty() {
-    if (!this.vm.running && !this.warping && !this.player.from) this.partyMenu.show();
+    if (this.idle && this.story.party.length) this.startMenu.openParty();
+  }
+
+  // ---- saving ----
+
+  /** Where the player stands, as a save keeps it. */
+  private location(): SaveFile['location'] {
+    const c = this.world.locate(this.player.x, this.player.y)!;
+    return { map: c.m.data.name, x: c.x, y: c.y, facing: this.player.facing };
+  }
+
+  /** FireRed's save dialogue: ask, warn about another game's save, save, confirm. */
+  async saveDialogue() {
+    const { textbox, texts } = this;
+    await textbox.say(texts.gText_WouldYouLikeToSaveTheGame);
+    if (!(await textbox.yesNo())) { textbox.close(); return; }
+    if (this.otherSave) {
+      await textbox.say(texts.gText_AlreadySaveFile_WouldLikeToOverwrite);
+      if (!(await textbox.yesNo())) { textbox.close(); return; }
+    }
+    await textbox.say(texts.gText_SavingDontTurnOffThePower, { wait: false });
+    await this.clock.delayFrames(60);
+    const ok = writeSave(makeSave(this.story, this.location()));
+    if (ok) this.otherSave = false;
+    await textbox.say(ok ? texts.gText_PlayerSavedTheGame : "The game couldn't be saved here: this browser won't store it.");
+    textbox.close();
+  }
+
+  /** CONTINUE: put the save's story back and the player where they saved. */
+  private continueFrom(save: SaveFile) {
+    applySave(this.story, save);
+    const m = this.world.mapByName(save.location.map);
+    if (m) {
+      this.world.area = m.area;
+      Object.assign(this.player, { x: save.location.x + m.ox, y: save.location.y + m.oy, facing: save.location.facing, from: null, t: 1 });
+      this.applyAreaLook();
+    }
+    this.applyOptions();
+    this.lastCell = ''; // the next frame runs the map's scripts, as loading a save does
+  }
+
+  /** OPTION's TEXT SPEED sets how fast the text box types. */
+  private applyOptions() {
+    this.textbox.speed = { SLOW: 20, MID: 40, FAST: 80 }[this.story.options.textSpeed];
   }
 
   /** Run the game on animation frames. */
@@ -294,9 +370,16 @@ export class Game implements ScriptHost {
   frame(dt: number) {
     const { player, vm, input, world } = this;
     this.clock.tick(dt);
-    this.doc.getElementById('partyBtn')!.hidden = !this.story.party.length;
-    // The party screen covers the world, which waits behind it as in FireRed.
-    if (this.partyMenu.open) { this.partyMenu.update(); return; }
+    // CONTINUE / NEW GAME comes first; the game waits for the choice.
+    if (this.title?.open) {
+      this.title.update();
+      if (!this.title.open) { if (this.title.choice === 'continue') this.continueFrom(readSave()!); else this.otherSave = true; }
+      return;
+    }
+    this.story.playTime += dt;
+    // The start menu (and the screens it opens) covers the world, which waits behind it as in FireRed.
+    if (this.startMenu.open) { this.startMenu.update(); return; }
+    if (input.buttons.startPressed) { input.buttons.startPressed = false; this.openStartMenu(); if (this.startMenu.open) return; }
     for (const a of this.areaActors()) {
       if (!a.from) continue;
       a.t += dt / (this.bb.stepSeconds * (a.jump ? 2 : 1));

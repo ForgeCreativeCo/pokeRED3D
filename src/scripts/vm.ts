@@ -3,13 +3,14 @@
 //
 // The common commands run; ones the game can't do yet (battles, the bag,
 // fanfares, menus) are skipped so their scenes play their lines and go on.
-// givemon creates a real Pokémon in the party; showmonpic shows its picture.
+// givemon creates a real Pokémon in the party; showmonpic shows its picture;
+// item commands fill and check the Bag.
 
 import type { Clock } from '../core/clock';
 import type { Input } from '../input/input';
 import type { World } from '../world/world';
 import type { LoadedMap } from '../data/load';
-import type { Command, Dir, PokemonFile, ScriptsFile } from '../data/types';
+import type { Command, Dir, ItemData, PokemonFile, ScriptsFile } from '../data/types';
 import type { TextBox, BoxStyle, TextColor } from '../ui/textbox';
 import type { Emote } from '../ui/emote';
 import { DIR_NUM, DIR_OF, faceToward, forceStep, opposite, type Actor } from '../characters/actor';
@@ -27,6 +28,7 @@ export interface ScriptHost {
   emote: Emote;
   music: { play(name: string | null | undefined): void };
   pokemon: PokemonFile;
+  items: Record<string, ItemData>;
   /** the window showmonpic opens beside the text box */
   monPic: { show(species: string): void; hide(): void };
   player: Actor;
@@ -162,13 +164,20 @@ export class ScriptVM {
           case 'specialvar': story.vars[resolve(args[0])!] = 0; break;
           case 'checkplayergender': story.vars.VAR_RESULT = 0; break;
           case 'waitfanfare': await clock.delayFrames(150); break; // the jingle holds "Obtained …" on screen
-          case 'checkitemspace': story.vars.VAR_RESULT = 1; break; // there's no bag yet, so always room
+          // The Bag. Amounts default to 1; the item may come from a variable.
+          case 'checkitemspace': story.vars.VAR_RESULT = story.bag.hasSpace(String(value(args[0])), Number(value(args[1] ?? '1'))) ? 1 : 0; break;
+          case 'checkitem': story.vars.VAR_RESULT = story.bag.count(String(value(args[0]))) >= Number(value(args[1] ?? '1')) ? 1 : 0; break;
+          case 'additem': story.vars.VAR_RESULT = story.bag.add(String(value(args[0])), Number(value(args[1] ?? '1'))) ? 1 : 0; break;
+          case 'removeitem': story.vars.VAR_RESULT = story.bag.remove(String(value(args[0])), Number(value(args[1] ?? '1'))) ? 1 : 0; break;
+          case 'addmoney': story.money = Math.min(999999, story.money + Number(value(args[0]))); break;
+          case 'removemoney': story.money = Math.max(0, story.money - Number(value(args[0]))); break;
+          case 'checkmoney': story.vars.VAR_RESULT = story.money >= Number(value(args[0])) ? 1 : 0; break;
           case 'bufferitemname': case 'bufferspeciesname': case 'buffermovename': {
             // {STR_VAR_n} in the next text. The name may come from a variable holding it
             // (PLAYER_STARTER_SPECIES -> SPECIES_BULBASAUR); species and moves use their real names.
             const key = String(value(args[1] ?? ''));
             const { species, moves } = this.host.pokemon;
-            story.names[resolve(args[0])!] = species[key]?.name ?? moves[key]?.name ?? key.replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
+            story.names[resolve(args[0])!] = species[key]?.name ?? moves[key]?.name ?? this.host.items[key]?.name ?? key.replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
             break;
           }
           case 'givemon': {
@@ -176,6 +185,7 @@ export class ScriptVM {
             const species = String(value(args[0])), level = Number(value(args[1] ?? '5'));
             if (this.host.pokemon.species[species] && story.party.length < 6) {
               story.party.push(createMon(this.host.pokemon, species, level, monRandom, { id: story.trainerId, name: story.names.PLAYER }));
+              story.register(species, true);
               story.vars.VAR_RESULT = 0;
             } else story.vars.VAR_RESULT = 2; // MON_CANT_GIVE: no PC boxes yet
             break;
@@ -197,11 +207,19 @@ export class ScriptVM {
           case 'message': if (text[args[0]] != null) await textbox.say(text[args[0]], { style: ctx.style, color: ctx.color, wait: false }); break;
           case 'waitbuttonpress': await clock.until(input.takeA); break;
           case 'closemessage': textbox.close(); break;
-          case 'giveitem_msg': if (text[args[0]] != null) await textbox.say(text[args[0]], { color: ctx.color }); story.vars.VAR_RESULT = 1; break;
+          case 'giveitem_msg': {
+            // giveitem_msg TEXT, ITEM[, AMOUNT]: add it, then show the scene's own line.
+            const ok = story.bag.add(String(value(args[1])), Number(value(args[2] ?? '1')));
+            if (text[args[0]] != null) await textbox.say(text[args[0]], { color: ctx.color });
+            story.vars.VAR_RESULT = ok ? 1 : 0;
+            break;
+          }
           case 'giveitem': case 'finditem': {
-            const item = (args[0] ?? '').replace(/^ITEM_/, '').replace(/_/g, ' ');
-            await textbox.say(`${story.names.PLAYER} obtained a ${item}!`);
-            story.vars.VAR_RESULT = 1;
+            const item = String(value(args[0])), n = Number(value(args[1] ?? '1'));
+            const name = this.host.items[item]?.name ?? item.replace(/^ITEM_/, '').replace(/_/g, ' ');
+            const ok = story.bag.add(item, n);
+            await textbox.say(ok ? `${story.names.PLAYER} obtained ${n > 1 ? n : 'a'} ${name}!` : 'Too bad! The BAG is full…');
+            story.vars.VAR_RESULT = ok ? 1 : 0;
             break;
           }
           case 'trainerbattle_single': case 'trainerbattle_double': {

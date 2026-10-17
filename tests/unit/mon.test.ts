@@ -14,7 +14,7 @@ const natures = NATURE_NAMES.map((name, i) => {
 const bulbasaur: Species = {
   name: 'BULBASAUR', base: { hp: 45, atk: 49, def: 49, spe: 45, spa: 65, spd: 65 },
   types: ['TYPE_GRASS', 'TYPE_POISON'], abilities: ['ABILITY_OVERGROW'], growth: 'GROWTH_MEDIUM_SLOW',
-  genderRatio: 31, catchRate: 45, expYield: 64, friendship: 70,
+  genderRatio: 31, catchRate: 45, expYield: 64, friendship: 70, dex: 1,
   learnset: [[1, 'MOVE_TACKLE'], [4, 'MOVE_GROWL'], [7, 'MOVE_LEECH_SEED'], [10, 'MOVE_VINE_WHIP'], [15, 'MOVE_POISON_POWDER'], [15, 'MOVE_SLEEP_POWDER']],
 };
 const move = (name: string, pp: number) => ({ name, type: 'TYPE_NORMAL', power: 0, accuracy: 100, pp, effect: 'EFFECT_HIT', effectChance: 0, target: 'MOVE_TARGET_SELECTED', priority: 0, contact: false });

@@ -51,8 +51,15 @@ Along the way:
   starting moves). Oak shows each starter's picture as you look at it, and
   the party screen and summary pages (POKéMON INFO, POKéMON SKILLS, KNOWN
   MOVES) follow FireRed's layout.
+- **Start menu:** POKéDEX and POKéMON (once you have them), BAG, your
+  trainer card, SAVE, OPTION and EXIT. The Bag has FireRed's pockets and
+  item descriptions, and items scenes give you land in it (the Route 1
+  clerk's free Potion). OPTION's text speed changes how fast text types.
+- **Saving:** FireRed's save dialogue, kept in your browser. Reopen the game
+  and CONTINUE puts you back where you saved, with your party, Bag, money,
+  Pokédex, time and every story flag.
 
-Not yet: battles, the start menu and Bag, saving.
+Not yet: battles, using items, nicknames.
 
 ## Getting started
 
@@ -65,23 +72,23 @@ npm run bake -- PalletTown Route1 Route21_North ViridianCity PalletTown_PlayersH
 npm run dev              # then open http://localhost:5173
 ```
 
-**Controls:** WASD or the arrow keys to walk; Z, Enter or Space for A (talk,
-read, continue); X or Backspace for B. There's an on-screen d-pad and A button
-for phones. Once you have a Pokémon, P (or the POKéMON button) opens the
-party. Music starts on your first key press or tap.
+**Controls:** WASD or the arrow keys to walk; Z or Space for A (talk, read,
+continue); X or Backspace for B; Enter for START (the menu). There's an
+on-screen d-pad, A button and START button for phones. Music starts on your
+first key press or tap.
 
 Other commands:
 
 | Command | What it does |
 |---|---|
 | `npm run classify -- <Map> …` | Classify a map's tiles and write debug overlays to `build/debug/` |
-| `npm run bake -- <Map> …` | Bake maps (plus their songs, scripts and the Pokémon data) into `build/` for the game to load |
+| `npm run bake -- <Map> …` | Bake maps (plus their songs, scripts, Pokémon and items) into `build/` for the game to load |
 | `npm run dev` | Run the game on http://localhost:5173, live-reloading as `src/` changes |
 | `npm run build` | Typecheck and build the game into `dist/`, with the baked data alongside |
 | `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
 | `npm run build:artifact` | The single-file page shaped for publishing as a claude.ai Artifact: `dist-single/pokered3d.html` |
 | `npm test` | Unit tests |
-| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`) in a build and compare it with its golden transcript |
+| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`, `save`) in a build and compare it with its golden transcript |
 
 Map names are folder names under `vendor/pokefirered/data/maps`. The first map
 in a bake is the origin; connected maps join it, and interiors become their
@@ -111,16 +118,18 @@ loads the baked files (`build/data/*.json` and each map's `map.json` and
 | `data/` | Types for every baked file, and the loader |
 | `world/` | The loaded maps as one grid: areas, cells, walkability, warps, triggers |
 | `characters/` | People: stepping, ledge hops, wandering, and their sprite billboards |
-| `scripts/` | Story state (flags, variables, the party), and the player for the decomp's event and map scripts |
+| `scripts/` | Story state (flags, variables, party, Bag, money, Pokédex, time, options), and the player for the decomp's event and map scripts |
+| `items/` | The Bag: pockets, stacks, FireRed's limits |
+| `save/` | Saving and loading the story and where you stand, in browser storage |
 | `pokemon/` | Pokémon as FireRed keeps them: creating one, stats, experience, nature, gender, ability, starting moves |
-| `ui/` | The text box and YES/NO, emotes, the Pokémon picture window, the party screen and summary pages, the tuning panel |
+| `ui/` | The text box and YES/NO, emotes, the Pokémon picture window, the start menu and its screens (party, summaries, Bag, trainer card, OPTION, Pokédex), the Continue screen, the tuning panel |
 | `audio/` | The synth that plays FireRed's songs |
 | `input/` | Keyboard, d-pad and A button |
 | `render/` | The scene, the follow camera, and the GBA view for compare mode |
 | `game.ts` | Wires it together and runs the frame |
 
-World, character, script and Pokémon logic don't touch three.js or the page,
-so they run under unit tests.
+World, character, script, Pokémon, Bag and save logic don't touch three.js or
+the page, so they run under unit tests.
 
 **The footprint principle** keeps it playable: anything raised in 3D covers
 exactly the cells FireRed blocks for it, plus its walk-behind row. Visuals and
@@ -136,7 +145,7 @@ tools/
   baker/
     classify.js        npm run classify
     bake.js            npm run bake
-    lib/               decomp readers, classifier, baker, sprites, music, scripts, Pokémon
+    lib/               decomp readers, classifier, baker, sprites, music, scripts, Pokémon, items
     debug/             the classification viewer
 src/                   the game (TypeScript, three.js), see "How it works"
 index.html             the game's page
@@ -151,8 +160,9 @@ dist/, dist-single/    game builds (gitignored)
 ## Testing
 
 `npm test` runs the unit tests: the world grid, people and wandering, the
-game clock, the script player, and the Pokémon formulas (stats, natures,
-experience, starting moves, checked against values worked out by hand), on
+game clock, the script player, the Pokémon formulas (stats, natures,
+experience, starting moves, checked against values worked out by hand), the
+Bag, and saving (a round trip, plus bad saves and storage that refuses), on
 small hand-made data, so they need no decomp.
 
 The game exposes a test hook, `window.pokered`, that drives it from a script:
@@ -165,7 +175,8 @@ pokered.text();                         // what the text box says
 pokered.where();                        // map, cell and facing
 pokered.people();                       // everyone in the area
 pokered.party();                        // the party: species, level, HP, moves
-await pokered.openParty();              // open the party screen; menu() says where it is
+pokered.bag();                          // the Bag's contents
+await pokered.press('start');           // open the start menu; menu() says which screen is up
 ```
 
 **Play-throughs** use it to play a scene end to end in a real browser
@@ -174,7 +185,10 @@ transcript: where the player is, what the text box says, who is where, and
 the story's flags and variables, and the party, any open menu and any
 Pokémon picture once there are some. `tests/playthrough/opening.json` plays
 the opening from the bedroom to Blue's challenge; `party.json` plays it again,
-then opens the party, reads every summary page and switches.
+then opens the party, reads every summary page and switches; `save.json` gets
+the Route 1 clerk's Potion, checks the Bag and the trainer card, saves,
+reloads the page and continues. A `["reload"]` step reloads the page with
+its storage, as closing and reopening the game would.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -201,7 +215,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Talking and scenes** | Text box, script player, map scripts, step-on triggers, the opening sequence |
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
-| 4 | **Start menu and saving** | Pokédex, Pokémon, Bag, player card and Save; a working Bag; save and load; the party moves into the menu |
+| ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
 | 5 | **Battles** | a. battle scene and UI · b. core mechanics ported from the decomp (damage, types, accuracy, status, experience) · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
@@ -224,7 +238,10 @@ This runs alongside the steps above:
 - Battles are skipped: trainers say their challenge and the scene continues.
 - There's no naming screen yet: saying YES to a nickname keeps the species
   name.
-- Until the start menu exists, the party opens from its own button (or P).
+- Items can't be used yet (Oak tells you it isn't the time), and there's no
+  GIVE until Pokémon can hold items.
+- A save lives in the browser that made it (each Artifact link is its own
+  site), so it doesn't follow you to another browser or device.
 - NPCs whose sprite is chosen at runtime (`OBJ_EVENT_GFX_VAR_*`) show as a
   placeholder marker.
 - The synth approximates the Game Boy channels' envelope timing and the

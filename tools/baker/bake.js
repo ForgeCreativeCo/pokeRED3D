@@ -18,6 +18,7 @@ import { bakeMap } from './lib/bake.js';
 import { bakeSong } from './lib/music.js';
 import { bakeScripts } from './lib/scripts.js';
 import { bakePokemon } from './lib/pokemon.js';
+import { bakeItems, uiText, nationalDex } from './lib/items.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const OUT = path.join(ROOT, 'build');
@@ -119,6 +120,17 @@ console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.
 // scripts mention (the starters, and any Pokémon a scene shows or gives).
 const named = new Set(Object.values(scripts.scripts).flat().flat().filter((a) => /^SPECIES_\w+$/.test(a) && a !== 'SPECIES_EGG' && a !== 'SPECIES_NONE'));
 const pokemon = bakePokemon([...named]);
+const dex = nationalDex();
+for (const [s, sp] of Object.entries(pokemon.species)) sp.dex = dex[s] ?? 0;
+
+// Items, and the lines the menus say (the save dialogue, the Bag's), kept
+// with the script text so the text box shows them the same way.
+const items = { format: { name: 'pokered3d-items', version: 1 }, items: bakeItems(), startMoney: newGame().money };
+Object.assign(scripts.text, uiText([
+  'gText_WouldYouLikeToSaveTheGame', 'gText_AlreadySaveFile_WouldLikeToOverwrite', 'gText_SavingDontTurnOffThePower',
+  'gText_PlayerSavedTheGame', 'gText_OakForbidsUseOfItemHere', 'gText_ThrowAwayStrVar2OfThisItemQM',
+]));
+console.log(`Items: ${Object.keys(items.items).length}; a new game starts with ${items.startMoney} money`);
 console.log(`Pokémon: ${Object.keys(pokemon.species).length} species, ${Object.keys(pokemon.moves).length} moves; pictures of ${Object.keys(pokemon.pics).join(', ') || 'none'}`);
 
 // The game loads these as files: the world's layout and start, the scripts,
@@ -130,4 +142,5 @@ fs.writeFileSync(path.join(DATA, 'world.json'), JSON.stringify({ format: { name:
 fs.writeFileSync(path.join(DATA, 'scripts.json'), JSON.stringify(scripts));
 fs.writeFileSync(path.join(DATA, 'music.json'), JSON.stringify(music));
 fs.writeFileSync(path.join(DATA, 'pokemon.json'), JSON.stringify(pokemon));
-console.log(`\nGame data: build/data/ (world, scripts, music, pokemon)`);
+fs.writeFileSync(path.join(DATA, 'items.json'), JSON.stringify(items));
+console.log(`\nGame data: build/data/ (world, scripts, music, pokemon, items)`);

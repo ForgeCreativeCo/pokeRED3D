@@ -29,7 +29,7 @@ export async function play(steps, { url, seed = 1 }) {
     // The party and an open menu are recorded only once there are any, so
     // steps before them read the same as ever.
     const snapshot = () => page.evaluate(() => {
-      const party = pokered.party(), menu = pokered.menu(), pic = pokered.monPic();
+      const party = pokered.party(), menu = pokered.menu(), pic = pokered.monPic(), bag = pokered.bag();
       return {
         where: pokered.where(),
         text: pokered.text(),
@@ -39,6 +39,7 @@ export async function play(steps, { url, seed = 1 }) {
         ...(party.length && { party }),
         ...(menu !== 'closed' && { menu }),
         ...(pic && { monPic: pic }),
+        ...(bag.length && { bag }),
       };
     });
     const call = (method, ...args) => page.evaluate(([m, a]) => pokered[m](...a), [method, args]);
@@ -95,6 +96,10 @@ export async function play(steps, { url, seed = 1 }) {
           }
         }
         entry.said = said;
+      } else if (method === 'reload') {
+        // ['reload']: reload the page, as closing and reopening the game would (storage stays).
+        await page.reload();
+        await page.waitForFunction(() => window.pokered, null, { timeout: 60000, polling: 100 });
       } else {
         await call(method, ...args);
       }

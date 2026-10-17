@@ -30,6 +30,7 @@ Outputs:
 - `build/data/world.json`: which maps are in the bake and where each sits. Connected outdoor maps form one area; each interior is its own area, reached through doors, exit mats and stairs. `start` is where a new game begins (Red's bedroom) when that map is in the bake.
 - `build/data/scripts.json`, `build/data/music.json`: the scripts and text, and the songs with their samples (see below)
 - `build/data/pokemon.json`: every species and move, the natures and ability names, and pictures of the Pokémon the scripts mention (see below)
+- `build/data/items.json`: every item (name, price, pocket, description) and the money a new game starts with
 
 The game (`src/`, `npm run dev`) loads these. Walk with WASD, hop ledges,
 tune the camera from the panel, and compare against the original GBA view.
@@ -131,6 +132,7 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 // pokemon.json: { "species": { SPECIES_…: { name, base, types, abilities, growth, genderRatio, learnset, … } },
 //                 "moves": { MOVE_…: { name, type, power, accuracy, pp, … } }, "natures", "abilities",
 //                 "pics": { SPECIES_…: { front, back, icon } } }   // PNG data URIs
+// items.json:   { "items": { ITEM_…: { name, price, pocket, description, param, fieldUse, important } }, "startMoney" }
 ```
 
 `src/data/types.ts` types every one of these files.
@@ -145,6 +147,7 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
 | Scenes and triggers | **done** | Map scripts, step-on triggers, scripted walking, script warps; FireRed's opening plays |
 | Talking and signs | **done** | Decomp scripts and text; common commands; battles and menus skipped |
+| Items | **done** | Items from `src/data/items.json`; the menus' own lines from the decomp's text (`tools/baker/lib/items.js`) |
 | Pokémon | **done** | Species, moves, natures and pictures from the decomp (`tools/baker/lib/pokemon.js`) |
 | Music | **done** | Map songs from the decomp's MIDI, voicegroups and samples |
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
@@ -175,7 +178,17 @@ The game creates Pokémon with FireRed's own formulas (`src/pokemon/mon.ts`):
 a 32-bit personality decides nature, gender and ability; IVs come from two
 16-bit rolls; stats, experience by growth rate and starting moves follow
 `src/pokemon.c`. New Pokémon draw on their own random stream, so rolling one
-never shifts how people wander.
+never shifts how people wander. Each species also gets its National Pokédex
+number, from `sSpeciesToNationalPokedexNum`.
+
+## Items and the menus' text
+
+`tools/baker/lib/items.js` bakes every item from the decomp's
+`src/data/items.json`, and the starting money from `new_game.c`. What the
+menus say (the save dialogue, Oak telling you it isn't the time to use an
+item, the toss question) is FireRed's own text, read by label from
+`data/text/*.inc` and `src/strings.c` and merged into `scripts.json`, so the
+text box shows it exactly as it shows script text.
 
 ## Music
 
