@@ -5,7 +5,7 @@ import { Clock } from '../../src/core/clock';
 import { Input } from '../../src/input/input';
 import { World } from '../../src/world/world';
 import { makeActor } from '../../src/characters/actor';
-import type { Command, ScriptsFile } from '../../src/data/types';
+import type { Command, PokemonFile, ScriptsFile } from '../../src/data/types';
 import type { TextBox } from '../../src/ui/textbox';
 import type { Emote } from '../../src/ui/emote';
 import { makeMap } from './fixtures';
@@ -21,6 +21,12 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
     yesNo: async () => 1,
     close() {}, hideChoice() {},
   } as unknown as TextBox;
+  const pics: string[] = [];
+  const pokemon = {
+    species: { SPECIES_BULBASAUR: { name: 'BULBASAUR', base: { hp: 45, atk: 49, def: 49, spe: 45, spa: 65, spd: 65 }, types: ['TYPE_GRASS'], abilities: ['ABILITY_OVERGROW'], growth: 'GROWTH_MEDIUM_SLOW', genderRatio: 31, catchRate: 45, expYield: 64, friendship: 70, learnset: [[1, 'MOVE_TACKLE']] } },
+    moves: { MOVE_TACKLE: { name: 'TACKLE', type: 'TYPE_NORMAL', power: 35, accuracy: 95, pp: 35, effect: 'EFFECT_HIT', effectChance: 0, target: 'MOVE_TARGET_SELECTED', priority: 0, contact: true } },
+    natures: Array.from({ length: 25 }, () => ({ name: 'HARDY', mods: [0, 0, 0, 0, 0] })), abilities: {}, pics: {},
+  } as unknown as PokemonFile;
   const player = makeActor({ gfx: 'PLAYER', x: 2, y: 2 }, map);
   const npcs = map.data.objects.map((o) => makeActor(o, map));
   const host: ScriptHost = {
@@ -29,9 +35,11 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
     music: { play: (n) => { played.push(n); } },
     player, npcs, areaActors: () => [player, ...npcs],
     warpTo: async () => {},
+    pokemon,
+    monPic: { show: (s) => { pics.push(s); }, hide: () => { pics.push('hidden'); } },
   };
   const data: ScriptsFile = { scripts, text: {}, consts: {}, textColors: {}, startFlags: [], ...more };
-  return { vm: new ScriptVM(data, host), host, said, played, map, player, npcs };
+  return { vm: new ScriptVM(data, host), host, said, played, pics, map, player, npcs };
 }
 
 /** Run frames until the VM is idle, finishing any step as soon as it starts. */
@@ -145,6 +153,32 @@ describe('ScriptVM', () => {
     expect(t.vm.triggerAt(1, 1)?.script).toBe('Stop');
     t.host.story.vars.VAR_SCENE = 1;
     expect(t.vm.triggerAt(1, 1)).toBeUndefined();
+  });
+
+  it('gives a real Pokémon with givemon, from a variable holding the species', async () => {
+    const t = setup({ Main: [
+      ['setvar', 'VAR_TEMP_2', 'SPECIES_BULBASAUR'],
+      ['showmonpic', 'VAR_TEMP_2', '10', '3'],
+      ['givemon', 'VAR_TEMP_2', '5'],
+      ['bufferspeciesname', 'STR_VAR_1', 'VAR_TEMP_2'],
+    ] });
+    await t.vm.run('Main', null);
+    const [mon] = t.host.story.party;
+    expect(t.host.story.party).toHaveLength(1);
+    expect(mon.species).toBe('SPECIES_BULBASAUR');
+    expect(mon.level).toBe(5);
+    expect(mon.moves.map((m) => m.move)).toEqual(['MOVE_TACKLE']);
+    expect(mon.otName).toBe('RED');
+    expect(t.host.story.vars.VAR_RESULT).toBe(0);
+    expect(t.host.story.names.STR_VAR_1).toBe('BULBASAUR');
+    expect(t.pics).toEqual(['SPECIES_BULBASAUR', 'hidden']); // the picture closes when the scene ends
+  });
+
+  it('stops giving at six', async () => {
+    const t = setup({ Main: Array.from({ length: 7 }, () => ['givemon', 'SPECIES_BULBASAUR', '5'] as Command) });
+    await t.vm.run('Main', null);
+    expect(t.host.story.party).toHaveLength(6);
+    expect(t.host.story.vars.VAR_RESULT).toBe(2);
   });
 
   it('fills name buffers for the next text', async () => {

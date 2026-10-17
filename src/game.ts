@@ -19,6 +19,10 @@ import { GbaView } from './render/gbaView';
 import { TextBox } from './ui/textbox';
 import { Emote } from './ui/emote';
 import { Panel, pretty } from './ui/panel';
+import { MonPic } from './ui/monPic';
+import { PartyMenu } from './ui/party';
+import { monRandom } from './core/random';
+import type { PokemonFile } from './data/types';
 
 /** In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows. */
 const GBA_ROWS = 10;
@@ -39,6 +43,9 @@ export class Game implements ScriptHost {
   readonly textbox: TextBox;
   readonly emote: Emote;
   readonly vm: ScriptVM;
+  readonly pokemon: PokemonFile;
+  readonly monPic: MonPic;
+  readonly partyMenu: PartyMenu;
   readonly rig: CameraRig;
   readonly panel: Panel;
   /** a warp's fade is running */
@@ -74,7 +81,12 @@ export class Game implements ScriptHost {
 
     this.gba = new GbaView($('gba') as HTMLCanvasElement);
     this.music = new Music(data.music);
-    this.story = new Story(data.scripts.startFlags);
+    // A new save rolls the player's trainer ID (shown as the ID No. on their Pokémon).
+    const trainerId = ((Math.floor(monRandom() * 0x10000) << 16) | Math.floor(monRandom() * 0x10000)) >>> 0;
+    this.story = new Story(data.scripts.startFlags, trainerId);
+    this.pokemon = data.pokemon;
+    this.monPic = new MonPic(data.pokemon, doc);
+    this.partyMenu = new PartyMenu(data.pokemon, this.story, this.input, doc);
     this.textbox = new TextBox(this.clock, this.input, this.story, doc);
     this.emote = new Emote(this.clock, doc);
     this.vm = new ScriptVM(data.scripts, this);
@@ -101,6 +113,9 @@ export class Game implements ScriptHost {
       musicBtn.setAttribute('aria-pressed', String(!this.music.muted));
     };
     $('compareBtn').onclick = () => this.setCompare(!this.comparing);
+    // Until the start menu exists: the party opens from its own button, or P.
+    $('partyBtn').onclick = () => this.openParty();
+    addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p' && !(e.target as Element | null)?.closest?.('input')) this.openParty(); });
     this.canvas.addEventListener('pointerdown', () => this.canvas.focus());
     addEventListener('resize', () => this.resize());
 
@@ -108,6 +123,11 @@ export class Game implements ScriptHost {
     this.resize();
     // Compare mode: the original GBA view beside the 2.5D one. #compare in the link opens it.
     this.setCompare(location.hash === '#compare');
+  }
+
+  /** Open the party screen, when there's a party and nothing else is going on. */
+  openParty() {
+    if (!this.vm.running && !this.warping && !this.player.from) this.partyMenu.show();
   }
 
   /** Run the game on animation frames. */
@@ -274,6 +294,9 @@ export class Game implements ScriptHost {
   frame(dt: number) {
     const { player, vm, input, world } = this;
     this.clock.tick(dt);
+    this.doc.getElementById('partyBtn')!.hidden = !this.story.party.length;
+    // The party screen covers the world, which waits behind it as in FireRed.
+    if (this.partyMenu.open) { this.partyMenu.update(); return; }
     for (const a of this.areaActors()) {
       if (!a.from) continue;
       a.t += dt / (this.bb.stepSeconds * (a.jump ? 2 : 1));

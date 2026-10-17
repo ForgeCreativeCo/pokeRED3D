@@ -29,6 +29,7 @@ Outputs:
 - `build/maps/<Map>/map.json` + `atlas.png`: the baked map (format below)
 - `build/data/world.json`: which maps are in the bake and where each sits. Connected outdoor maps form one area; each interior is its own area, reached through doors, exit mats and stairs. `start` is where a new game begins (Red's bedroom) when that map is in the bake.
 - `build/data/scripts.json`, `build/data/music.json`: the scripts and text, and the songs with their samples (see below)
+- `build/data/pokemon.json`: every species and move, the natures and ability names, and pictures of the Pokémon the scripts mention (see below)
 
 The game (`src/`, `npm run dev`) loads these. Walk with WASD, hop ledges,
 tune the camera from the panel, and compare against the original GBA view.
@@ -127,6 +128,9 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 }
 // scripts.json: { "scripts": { label: [[command, ...args]] }, "text", "consts", "textColors", "startFlags" }
 // music.json:   { "songs": { name: song }, "samples": { name: 8-bit PCM, base64 }, "waves" }
+// pokemon.json: { "species": { SPECIES_…: { name, base, types, abilities, growth, genderRatio, learnset, … } },
+//                 "moves": { MOVE_…: { name, type, power, accuracy, pp, … } }, "natures", "abilities",
+//                 "pics": { SPECIES_…: { front, back, icon } } }   // PNG data URIs
 ```
 
 `src/data/types.ts` types every one of these files.
@@ -141,6 +145,7 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 | Stand-up | **done** | Buildings, objects, cutouts, ground under |
 | Scenes and triggers | **done** | Map scripts, step-on triggers, scripted walking, script warps; FireRed's opening plays |
 | Talking and signs | **done** | Decomp scripts and text; common commands; battles and menus skipped |
+| Pokémon | **done** | Species, moves, natures and pictures from the decomp (`tools/baker/lib/pokemon.js`) |
 | Music | **done** | Map songs from the decomp's MIDI, voicegroups and samples |
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
 | Map connections | **done** | Maps placed by their connection offsets; walk across edges |
@@ -156,6 +161,21 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 - **Interiors are flat** (`height.yaml` `flat_indoors`): indoor elevation only sorts sprites.
 - **Visibility** at the start comes from the decomp's new-game flag script, so Oak is hidden but Blue and the starters wait in the lab.
 - **Warps** follow FireRed: walk into a door, press the arrow's direction on an exit mat, or step onto stairs. Other cells listed as warps are inert.
+
+## Pokémon
+
+`tools/baker/lib/pokemon.js` reads the species table (base stats, types,
+abilities, growth rate, gender ratio), names, level-up learnsets, every move,
+the natures and their stat table straight from the decomp. All 411 species
+and 354 moves are baked as data. Pictures (front, back and the two-frame party
+icon, in each species' own palette) are baked only for the species the baked
+scripts mention, so far the three starters; wild encounters will add theirs.
+
+The game creates Pokémon with FireRed's own formulas (`src/pokemon/mon.ts`):
+a 32-bit personality decides nature, gender and ability; IVs come from two
+16-bit rolls; stats, experience by growth rate and starting moves follow
+`src/pokemon.c`. New Pokémon draw on their own random stream, so rolling one
+never shifts how people wander.
 
 ## Music
 

@@ -1256,7 +1256,8 @@
    "VAR_TEMP_2": "SPECIES_BULBASAUR",
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL"
-  }
+  },
+  "monPic": "BULBASAUR"
  },
  {
   "step": [
@@ -1340,7 +1341,8 @@
    "VAR_TEMP_2": "SPECIES_BULBASAUR",
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL"
-  }
+  },
+  "monPic": "BULBASAUR"
  },
  {
   "step": [
@@ -1504,14 +1506,17 @@
   "vars": {
    "VAR_MAP_SCENE_PALLET_TOWN_OAK": 1,
    "VAR_MAP_SCENE_PALLET_TOWN_PROFESSOR_OAKS_LAB": 2,
-   "VAR_RESULT": 1,
+   "VAR_RESULT": 0,
    "VAR_STARTER_MON": 0,
    "VAR_TEMP_1": 0,
    "VAR_TEMP_2": "SPECIES_BULBASAUR",
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -1597,7 +1602,10 @@
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -1687,7 +1695,10 @@
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -1775,7 +1786,10 @@
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -1863,7 +1877,10 @@
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -1957,7 +1974,10 @@
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -2047,7 +2067,10 @@
    "VAR_TEMP_3": "SPECIES_CHARMANDER",
    "VAR_TEMP_4": "LOCALID_CHARMANDER_BALL",
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  },
  {
   "step": [
@@ -2144,6 +2167,9 @@
    "VAR_STARTER_MON": 0,
    "VAR_TEMP_2": 1,
    "VAR_TEXT_COLOR": 0
-  }
+  },
+  "party": [
+   "BULBASAUR Lv5 20/20 [TACKLE, GROWL]"
+  ]
  }
 ]

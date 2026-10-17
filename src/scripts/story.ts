@@ -1,4 +1,7 @@
-// The save's story state: flags, variables, and the names text can insert.
+// The save's story state: flags, variables, the names text can insert, the
+// player's trainer ID and their party.
+
+import type { Mon } from '../pokemon/mon';
 
 export type Value = number | string | undefined;
 
@@ -7,8 +10,11 @@ export class Story {
   readonly vars: Record<string, Value> = {};
   /** {PLAYER}, {RIVAL}, and the {STR_VAR_n} buffers scripts fill */
   readonly names: Record<string, string> = { PLAYER: 'RED', RIVAL: 'BLUE' };
+  /** up to six, in order */
+  readonly party: Mon[] = [];
 
-  constructor(startFlags: string[]) {
+  /** startFlags: flags a new save sets; trainerId: 32 bits (the low 16 show as the ID No.) */
+  constructor(startFlags: string[], readonly trainerId = 0) {
     this.flags = new Set(startFlags);
   }
 

@@ -3,16 +3,19 @@
 //
 // The common commands run; ones the game can't do yet (battles, the bag,
 // fanfares, menus) are skipped so their scenes play their lines and go on.
+// givemon creates a real Pokémon in the party; showmonpic shows its picture.
 
 import type { Clock } from '../core/clock';
 import type { Input } from '../input/input';
 import type { World } from '../world/world';
 import type { LoadedMap } from '../data/load';
-import type { Command, Dir, ScriptsFile } from '../data/types';
+import type { Command, Dir, PokemonFile, ScriptsFile } from '../data/types';
 import type { TextBox, BoxStyle, TextColor } from '../ui/textbox';
 import type { Emote } from '../ui/emote';
 import { DIR_NUM, DIR_OF, faceToward, forceStep, opposite, type Actor } from '../characters/actor';
 import type { Story, Value } from './story';
+import { createMon } from '../pokemon/mon';
+import { monRandom } from '../core/random';
 
 /** What scripts reach into: the rest of the game. */
 export interface ScriptHost {
@@ -23,6 +26,9 @@ export interface ScriptHost {
   textbox: TextBox;
   emote: Emote;
   music: { play(name: string | null | undefined): void };
+  pokemon: PokemonFile;
+  /** the window showmonpic opens beside the text box */
+  monPic: { show(species: string): void; hide(): void };
   player: Actor;
   npcs: Actor[];
   areaActors(): Actor[];
@@ -157,11 +163,25 @@ export class ScriptVM {
           case 'checkplayergender': story.vars.VAR_RESULT = 0; break;
           case 'waitfanfare': await clock.delayFrames(150); break; // the jingle holds "Obtained …" on screen
           case 'checkitemspace': story.vars.VAR_RESULT = 1; break; // there's no bag yet, so always room
-          case 'bufferitemname': case 'bufferspeciesname': case 'buffermovename':
-            // {STR_VAR_n} in the next text: ITEM_POTION -> POTION
-            // The name may come from a variable holding it (PLAYER_STARTER_SPECIES -> SPECIES_BULBASAUR).
-            story.names[resolve(args[0])!] = String(value(args[1] ?? '')).replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
+          case 'bufferitemname': case 'bufferspeciesname': case 'buffermovename': {
+            // {STR_VAR_n} in the next text. The name may come from a variable holding it
+            // (PLAYER_STARTER_SPECIES -> SPECIES_BULBASAUR); species and moves use their real names.
+            const key = String(value(args[1] ?? ''));
+            const { species, moves } = this.host.pokemon;
+            story.names[resolve(args[0])!] = species[key]?.name ?? moves[key]?.name ?? key.replace(/^(ITEM|SPECIES|MOVE)_/, '').replace(/_/g, ' ');
             break;
+          }
+          case 'givemon': {
+            // givemon SPECIES, LEVEL: a new Pokémon joins the party (MON_GIVEN_TO_PARTY), if there's room.
+            const species = String(value(args[0])), level = Number(value(args[1] ?? '5'));
+            if (this.host.pokemon.species[species] && story.party.length < 6) {
+              story.party.push(createMon(this.host.pokemon, species, level, monRandom, { id: story.trainerId, name: story.names.PLAYER }));
+              story.vars.VAR_RESULT = 0;
+            } else story.vars.VAR_RESULT = 2; // MON_CANT_GIVE: no PC boxes yet
+            break;
+          }
+          case 'showmonpic': this.host.monPic.show(String(value(args[0]))); break;
+          case 'hidemonpic': this.host.monPic.hide(); break;
           case 'faceplayer': if (target) faceToward(target, player); break;
           case 'textcolor': ctx.color = TEXT_COLORS[value(args[0]) as number] ?? ctx.color; break;
           case 'signmsg': ctx.style = 'sign'; break;
@@ -234,6 +254,7 @@ export class ScriptVM {
       await Promise.all(ctx.moves);
       textbox.close();
       textbox.hideChoice();
+      if (this.depth === 1) this.host.monPic.hide();
       this.depth--; this.running = this.depth > 0;
       input.takeA();
     }

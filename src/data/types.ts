@@ -178,3 +178,50 @@ export interface MusicFile {
   samples: Record<string, { rate: number; loopStart: number; loopEnd: number; data: string }>;
   waves: Record<string, number[]>;
 }
+
+// ---- Pokémon (build/data/pokemon.json) ----
+
+export type StatKey = 'hp' | 'atk' | 'def' | 'spe' | 'spa' | 'spd';
+export type Stats = Record<StatKey, number>;
+
+export interface Species {
+  name: string;
+  base: Stats;
+  /** TYPE_GRASS, … (one or two) */
+  types: string[];
+  /** ABILITY_… (one or two; the personality picks which) */
+  abilities: string[];
+  /** GROWTH_MEDIUM_SLOW, … */
+  growth: string;
+  /** 0 always male, 254 always female, 255 genderless, else the female threshold */
+  genderRatio: number;
+  catchRate: number;
+  expYield: number;
+  friendship: number;
+  /** [level, MOVE_…], in the order they're learned */
+  learnset: [number, string][];
+}
+
+export interface MoveData {
+  name: string;
+  type: string;
+  power: number;
+  accuracy: number;
+  pp: number;
+  effect: string;
+  effectChance: number;
+  target: string;
+  priority: number;
+  contact: boolean;
+}
+
+export interface PokemonFile {
+  format: { name: 'pokered3d-pokemon'; version: 1 };
+  species: Record<string, Species>;
+  moves: Record<string, MoveData>;
+  /** in FireRed's order; mods are +1 / -1 / 0 for Attack, Defense, Speed, Sp. Atk, Sp. Def */
+  natures: { name: string; mods: number[] }[];
+  abilities: Record<string, string>;
+  /** PNG data URIs, for the species the scripts mention: front and back 64x64, icon 32x64 (two frames) */
+  pics: Record<string, { front: string; back: string; icon: string }>;
+}

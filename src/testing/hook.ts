@@ -4,6 +4,7 @@
 
 import type { Game } from '../game';
 import type { Dir } from '../data/types';
+import { displayName } from '../pokemon/mon';
 
 // Yield to the page between test frames (a message-channel task: background tabs don't slow it down),
 // so scripts waiting on a frame get to continue, as they do between real animation frames.
@@ -41,13 +42,24 @@ export function installHook(game: Game) {
     },
     /** Start an event script by name, as if talking to no one in particular. */
     run(label: string) { game.vm.run(label, null); return hook.tick(0.1); },
-    /** Press A (or B) once, then let some game time pass. */
-    async press(button: 'a' | 'b' = 'a', seconds = 0.5) {
-      input.buttons[`${button}Pressed`] = true;
+    /** Press A, B or a direction once (directions as a menu press), then let some game time pass. */
+    async press(button: 'a' | 'b' | Dir = 'a', seconds = 0.5) {
+      if (button === 'a' || button === 'b') input.buttons[`${button}Pressed`] = true;
+      else input.pressDir(button);
       await hook.tick(seconds);
       return hook.text();
     },
     async tick(seconds: number) { await runFrames(seconds); },
+    /** The party: species, level, HP and moves of each. */
+    party() {
+      return game.story.party.map((m) => `${displayName(game.pokemon, m)} Lv${m.level} ${m.hp}/${m.stats.hp} [${m.moves.map((x) => game.pokemon.moves[x.move]?.name ?? x.move).join(', ')}]`);
+    },
+    /** Open the party screen (as its button does). */
+    async openParty() { game.openParty(); await hook.tick(0.1); return hook.menu(); },
+    /** The party screen's state ('closed', 'party BULBASAUR', 'summary BULBASAUR: KNOWN MOVES', …). */
+    menu() { return game.partyMenu.state; },
+    /** The Pokémon showmonpic is showing ('' when none). */
+    monPic() { return game.monPic.shown; },
     /** What the text box shows right now ('' when closed). */
     text() { return game.textbox.shown; },
     where() {

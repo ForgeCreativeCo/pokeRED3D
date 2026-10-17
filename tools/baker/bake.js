@@ -17,6 +17,7 @@ import { classifyTilesets } from './lib/classify.js';
 import { bakeMap } from './lib/bake.js';
 import { bakeSong } from './lib/music.js';
 import { bakeScripts } from './lib/scripts.js';
+import { bakePokemon } from './lib/pokemon.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const OUT = path.join(ROOT, 'build');
@@ -114,12 +115,19 @@ for (const m of new Set([...world.map((w) => w.data.music), ...scriptSongs])) {
 }
 console.log(`Music: ${Object.keys(music.songs).join(', ')} (${Object.keys(music.samples).length} samples)`);
 
-// The game loads these as files: the world's layout and start, the scripts
-// and the music. Each map's map.json and atlas.png are fetched by name.
+// Pokémon: every species and move as data; pictures for each species the
+// scripts mention (the starters, and any Pokémon a scene shows or gives).
+const named = new Set(Object.values(scripts.scripts).flat().flat().filter((a) => /^SPECIES_\w+$/.test(a) && a !== 'SPECIES_EGG' && a !== 'SPECIES_NONE'));
+const pokemon = bakePokemon([...named]);
+console.log(`Pokémon: ${Object.keys(pokemon.species).length} species, ${Object.keys(pokemon.moves).length} moves; pictures of ${Object.keys(pokemon.pics).join(', ') || 'none'}`);
+
+// The game loads these as files: the world's layout and start, the scripts,
+// the music and the Pokémon. Each map's map.json and atlas.png are fetched by name.
 const DATA = path.join(OUT, 'data');
 fs.mkdirSync(DATA, { recursive: true });
 const layout = world.map(({ area, ox, oy, data }) => ({ map: data.name, area, ox, oy }));
 fs.writeFileSync(path.join(DATA, 'world.json'), JSON.stringify({ format: { name: 'pokered3d-world', version: 1 }, maps: layout, start }));
 fs.writeFileSync(path.join(DATA, 'scripts.json'), JSON.stringify(scripts));
 fs.writeFileSync(path.join(DATA, 'music.json'), JSON.stringify(music));
-console.log(`\nGame data: build/data/ (world, scripts, music)`);
+fs.writeFileSync(path.join(DATA, 'pokemon.json'), JSON.stringify(pokemon));
+console.log(`\nGame data: build/data/ (world, scripts, music, pokemon)`);

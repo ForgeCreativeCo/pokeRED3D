@@ -27,8 +27,9 @@ FireRed's opening, from a new save:
 2. Go downstairs and talk to Mom, then head out into Pallet Town.
 3. Walk north and Professor Oak stops you at the edge of town ("Hey! Wait!
    Don't go out!"), then leads you to his lab.
-4. Blue complains, Oak offers three Poké Balls, and you choose your starter.
-   Blue takes his, then challenges you on the way out.
+4. Blue complains, Oak offers three Poké Balls, and you choose your starter:
+   a real level 5 Pokémon joins your party. Blue takes his, then challenges
+   you on the way out.
 
 Along the way:
 
@@ -45,8 +46,13 @@ Along the way:
   own instruments and samples.
 - **Compare mode:** the original 240×160 GBA screen side by side with the
   2.5D view, both driven by the same game state.
+- **Pokémon:** every species and move from the decomp, created with
+  FireRed's own formulas (personality, nature, IVs, stats, experience,
+  starting moves). Oak shows each starter's picture as you look at it, and
+  the party screen and summary pages (POKéMON INFO, POKéMON SKILLS, KNOWN
+  MOVES) follow FireRed's layout.
 
-Not yet: battles, the start menu and Bag, Pokémon data, saving.
+Not yet: battles, the start menu and Bag, saving.
 
 ## Getting started
 
@@ -61,20 +67,21 @@ npm run dev              # then open http://localhost:5173
 
 **Controls:** WASD or the arrow keys to walk; Z, Enter or Space for A (talk,
 read, continue); X or Backspace for B. There's an on-screen d-pad and A button
-for phones. Music starts on your first key press or tap.
+for phones. Once you have a Pokémon, P (or the POKéMON button) opens the
+party. Music starts on your first key press or tap.
 
 Other commands:
 
 | Command | What it does |
 |---|---|
 | `npm run classify -- <Map> …` | Classify a map's tiles and write debug overlays to `build/debug/` |
-| `npm run bake -- <Map> …` | Bake maps (plus their songs and scripts) into `build/` for the game to load |
+| `npm run bake -- <Map> …` | Bake maps (plus their songs, scripts and the Pokémon data) into `build/` for the game to load |
 | `npm run dev` | Run the game on http://localhost:5173, live-reloading as `src/` changes |
 | `npm run build` | Typecheck and build the game into `dist/`, with the baked data alongside |
 | `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
 | `npm run build:artifact` | The single-file page shaped for publishing as a claude.ai Artifact: `dist-single/pokered3d.html` |
 | `npm test` | Unit tests |
-| `npm run playthrough -- opening --check [dev|dist|single]` | Play the opening in a build and compare it with its golden transcript |
+| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`) in a build and compare it with its golden transcript |
 
 Map names are folder names under `vendor/pokefirered/data/maps`. The first map
 in a bake is the origin; connected maps join it, and interiors become their
@@ -104,15 +111,16 @@ loads the baked files (`build/data/*.json` and each map's `map.json` and
 | `data/` | Types for every baked file, and the loader |
 | `world/` | The loaded maps as one grid: areas, cells, walkability, warps, triggers |
 | `characters/` | People: stepping, ledge hops, wandering, and their sprite billboards |
-| `scripts/` | Story flags and variables, and the player for the decomp's event and map scripts |
-| `ui/` | The text box and YES/NO, emotes, the tuning panel |
+| `scripts/` | Story state (flags, variables, the party), and the player for the decomp's event and map scripts |
+| `pokemon/` | Pokémon as FireRed keeps them: creating one, stats, experience, nature, gender, ability, starting moves |
+| `ui/` | The text box and YES/NO, emotes, the Pokémon picture window, the party screen and summary pages, the tuning panel |
 | `audio/` | The synth that plays FireRed's songs |
 | `input/` | Keyboard, d-pad and A button |
 | `render/` | The scene, the follow camera, and the GBA view for compare mode |
 | `game.ts` | Wires it together and runs the frame |
 
-World, character and script logic don't touch three.js or the page, so they
-run under unit tests.
+World, character, script and Pokémon logic don't touch three.js or the page,
+so they run under unit tests.
 
 **The footprint principle** keeps it playable: anything raised in 3D covers
 exactly the cells FireRed blocks for it, plus its walk-behind row. Visuals and
@@ -128,7 +136,7 @@ tools/
   baker/
     classify.js        npm run classify
     bake.js            npm run bake
-    lib/               decomp readers, classifier, baker, sprites, music, scripts
+    lib/               decomp readers, classifier, baker, sprites, music, scripts, Pokémon
     debug/             the classification viewer
 src/                   the game (TypeScript, three.js), see "How it works"
 index.html             the game's page
@@ -143,8 +151,9 @@ dist/, dist-single/    game builds (gitignored)
 ## Testing
 
 `npm test` runs the unit tests: the world grid, people and wandering, the
-game clock, and the script player, on small hand-made maps, so they need no
-decomp.
+game clock, the script player, and the Pokémon formulas (stats, natures,
+experience, starting moves, checked against values worked out by hand), on
+small hand-made data, so they need no decomp.
 
 The game exposes a test hook, `window.pokered`, that drives it from a script:
 
@@ -155,13 +164,17 @@ await pokered.press('a');               // press A
 pokered.text();                         // what the text box says
 pokered.where();                        // map, cell and facing
 pokered.people();                       // everyone in the area
+pokered.party();                        // the party: species, level, HP, moves
+await pokered.openParty();              // open the party screen; menu() says where it is
 ```
 
 **Play-throughs** use it to play a scene end to end in a real browser
 (Playwright with your installed Chrome) and compare every step with a golden
 transcript: where the player is, what the text box says, who is where, and
-the story's flags and variables. `tests/playthrough/opening.json` plays the
-opening from the bedroom to Blue's challenge.
+the story's flags and variables, and the party, any open menu and any
+Pokémon picture once there are some. `tests/playthrough/opening.json` plays
+the opening from the bedroom to Blue's challenge; `party.json` plays it again,
+then opens the party, reads every summary page and switches.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -187,8 +200,8 @@ running in any browser and publishable as a single page.
 | ✓ | **Overworld** | Walking, ledges, tall grass, warps, compare mode, music |
 | ✓ | **Talking and scenes** | Text box, script player, map scripts, step-on triggers, the opening sequence |
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
-| 3 | **Start menu and saving** | Pokédex, Pokémon, Bag, player card and Save; a working Bag; save and load |
-| 4 | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; party screen and summaries |
+| ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
+| 4 | **Start menu and saving** | Pokédex, Pokémon, Bag, player card and Save; a working Bag; save and load; the party moves into the menu |
 | 5 | **Battles** | a. battle scene and UI · b. core mechanics ported from the decomp (damage, types, accuracy, status, experience) · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
@@ -209,6 +222,9 @@ This runs alongside the steps above:
 ### Known gaps
 
 - Battles are skipped: trainers say their challenge and the scene continues.
+- There's no naming screen yet: saying YES to a nickname keeps the species
+  name.
+- Until the start menu exists, the party opens from its own button (or P).
 - NPCs whose sprite is chosen at runtime (`OBJ_EVENT_GFX_VAR_*`) show as a
   placeholder marker.
 - The synth approximates the Game Boy channels' envelope timing and the

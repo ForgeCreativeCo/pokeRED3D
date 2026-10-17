@@ -1,5 +1,6 @@
 // Keyboard, the on-screen d-pad and A button. Directions are held; A and B
-// also latch a press, taken once by whatever is waiting for one.
+// also latch a press, taken once by whatever is waiting for one. Menus read
+// directions as presses too (one move per press), from `taken`.
 
 import type { Dir } from '../data/types';
 
@@ -11,6 +12,22 @@ export class Input {
   /** held directions, most recent last */
   readonly held = new Set<Dir>();
   readonly buttons = { a: false, b: false, aPressed: false, bPressed: false };
+  /** the last direction pressed (not held), for menus */
+  private dirPressed: Dir | null = null;
+
+  /** One menu press: a direction, A or B, each taken once. */
+  taken(): Dir | 'a' | 'b' | null {
+    if (this.buttons.aPressed) { this.buttons.aPressed = false; return 'a'; }
+    if (this.buttons.bPressed) { this.buttons.bPressed = false; return 'b'; }
+    const d = this.dirPressed;
+    this.dirPressed = null;
+    return d;
+  }
+
+  /** Press a direction once (the d-pad and keys do this; tests can too). */
+  pressDir(dir: Dir) {
+    this.dirPressed = dir;
+  }
 
   /** True once per press (A or B: both advance text, as in FireRed). */
   takeA = () => {
@@ -48,6 +65,7 @@ export class Input {
     addEventListener('keydown', (e) => {
       const dir = keyDirs[e.key.toLowerCase()];
       if (!dir || (e.target as Element | null)?.closest?.('input')) return;
+      if (!e.repeat) this.dirPressed = dir;
       this.held.add(dir);
       e.preventDefault();
     });
@@ -55,7 +73,7 @@ export class Input {
     addEventListener('blur', () => this.held.clear());
     for (const b of doc.querySelectorAll<HTMLButtonElement>('#dpad button')) {
       const dir = b.dataset.dir as Dir;
-      const on = (e: PointerEvent) => { e.preventDefault(); this.held.add(dir); b.classList.add('held'); b.setPointerCapture?.(e.pointerId); };
+      const on = (e: PointerEvent) => { e.preventDefault(); this.dirPressed = dir; this.held.add(dir); b.classList.add('held'); b.setPointerCapture?.(e.pointerId); };
       const off = () => { this.held.delete(dir); b.classList.remove('held'); };
       b.addEventListener('pointerdown', on);
       b.addEventListener('pointerup', off);

@@ -26,13 +26,21 @@ export async function play(steps, { url, seed = 1 }) {
     await page.goto(`${url}${url.includes('?') ? '&' : '?'}seed=${seed}`);
     // Poll on a timer: the default polls on animation frames, which are off.
     await page.waitForFunction(() => window.pokered, null, { timeout: 60000, polling: 100 });
-    const snapshot = () => page.evaluate(() => ({
-      where: pokered.where(),
-      text: pokered.text(),
-      people: pokered.people(),
-      flags: [...pokered.story.flags].sort(),
-      vars: Object.fromEntries(Object.entries(pokered.story.vars).sort()),
-    }));
+    // The party and an open menu are recorded only once there are any, so
+    // steps before them read the same as ever.
+    const snapshot = () => page.evaluate(() => {
+      const party = pokered.party(), menu = pokered.menu(), pic = pokered.monPic();
+      return {
+        where: pokered.where(),
+        text: pokered.text(),
+        people: pokered.people(),
+        flags: [...pokered.story.flags].sort(),
+        vars: Object.fromEntries(Object.entries(pokered.story.vars).sort()),
+        ...(party.length && { party }),
+        ...(menu !== 'closed' && { menu }),
+        ...(pic && { monPic: pic }),
+      };
+    });
     const call = (method, ...args) => page.evaluate(([m, a]) => pokered[m](...a), [method, args]);
     const state = () => page.evaluate(() => ({
       where: pokered.where(), text: pokered.text(), busy: pokered.scriptDepth > 0,
