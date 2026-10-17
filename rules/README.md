@@ -205,14 +205,17 @@ the decomp:
 - **Types:** `gTypeEffectiveness` as FireRed lists it, multipliers x10 (0,
   5, 20; pairs not listed are 10). The entries after the Foresight separator
   (Normal and Fighting on Ghost) are kept apart, as they stop applying once
-  Foresight is used. Type names come from `gTypeNames`.
+  Foresight is used. Type names come from `gTypeNames`, and which types are
+  physical from their order (`IS_TYPE_PHYSICAL`: below `TYPE_MYSTERY`).
 - **Wild Pokémon:** each baked map's FireRed table from
   `src/data/wild_encounters.json` (the LeafGreen ones are skipped): land,
   water, Rock Smash and fishing, each with the map's rate and its slots, plus
   the slot weights and which fishing slots each rod uses.
 - **Trainers:** every trainer a baked script's `trainerbattle_*` names, from
   `src/data/trainers.h` and `trainer_parties.h`: class and its name,
-  party (level, IVs, held item and moves where the decomp gives them), items,
+  party (level, IVs, held item and moves where the decomp gives them, and
+  the fixed personality `CreateNPCTrainerParty` gives each one, summed from
+  the trainer's and species' names in the GBA encoding of `charmap.txt`), items,
   AI flags, the prize-money factor (`gTrainerMoneyTable`), and the music for
   being spotted, the battle and the win, read from the switches in
   `PlayTrainerEncounterMusic`, `GetBattleBGM` and the victory code. The

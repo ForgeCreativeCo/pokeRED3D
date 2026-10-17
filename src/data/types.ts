@@ -201,6 +201,8 @@ export interface Species {
   genderRatio: number;
   catchRate: number;
   expYield: number;
+  /** effort values a defeated one gives */
+  evYield: Stats;
   friendship: number;
   /** [level, MOVE_…], in the order they're learned */
   learnset: [number, string][];
@@ -281,6 +283,8 @@ export interface TrainerMon {
   species: string;
   item?: string;
   moves?: string[];
+  /** fixed, from the trainer's and species' names (CreateNPCTrainerParty) */
+  personality: number;
 }
 
 export interface Trainer {
@@ -313,6 +317,8 @@ export interface BattleFile {
     foresight: [string, string, number][];
     /** TYPE_… -> NORMAL, FIGHT, … */
     names: Record<string, string>;
+    /** the types whose moves are physical (Gen 3 splits by type, not by move) */
+    physical: string[];
   };
   wild: {
     /** weights of each slot, by kind (land: 20, 20, 10, …) */

@@ -72,7 +72,23 @@ export function bakeTypes() {
   }
   const src = read('src/battle_main.c');
   const names = Object.fromEntries([...braceBlock(src, src.indexOf('gTypeNames[')).matchAll(/\[(TYPE_\w+)\]\s*=\s*_\("([^"]*)"\)/g)].map(([, k, v]) => [k, v]));
-  return { chart, foresight, names };
+  // Gen 3 splits physical and special by type: IS_TYPE_PHYSICAL is "below TYPE_MYSTERY".
+  const ids = defines('include/constants/pokemon.h', 'TYPE_');
+  const physical = Object.keys(names).filter((t) => ids[t] < ids.TYPE_MYSTERY);
+  return { chart, foresight, names, physical };
+}
+
+let charmap;
+/** A string in the GBA's character encoding (charmap.txt), as byte values. */
+function encode(s) {
+  if (!charmap) {
+    charmap = new Map();
+    for (const [, c, hex] of read('charmap.txt').matchAll(/^'(\\.|[^'\\]{1,2})'\s*=\s*([0-9A-Fa-f]{2})\s*$/gm)) charmap.set(c.replace(/^\\/, ''), parseInt(hex, 16));
+  }
+  return [...s].map((c) => {
+    if (!charmap.has(c)) throw new Error(`No character "${c}" in charmap.txt`);
+    return charmap.get(c);
+  });
 }
 
 // ---- wild Pokémon ----
@@ -108,6 +124,9 @@ export function bakeWild(mapIds) {
 }
 
 // ---- trainers ----
+
+let speciesNameIndex;
+const speciesNames = () => (speciesNameIndex ??= Object.fromEntries([...read('src/data/text/species_names.h').matchAll(/\[(SPECIES_\w+)\]\s*=\s*_\("([^"]*)"\)/g)].map(([, k, v]) => [k, v])));
 
 let partyIndex;
 /** sParty_X symbol -> [{ iv, level, species, item?, moves? }] */
@@ -199,15 +218,27 @@ export function bakeTrainers(ids) {
     const music = t.encounterMusic_gender.split('|').map((s) => s.trim());
     const encounter = music.find((m) => m.startsWith('TRAINER_ENCOUNTER_MUSIC_'));
     const cls = t.trainerClass;
+    const name = t.trainerName.match(/_\("([^"]*)"\)/)[1];
+    const double = t.doubleBattle === 'TRUE', female = music.includes('F_TRAINER_FEMALE');
+    // CreateNPCTrainerParty: each Pokémon's personality is fixed, from a sum of
+    // the trainer's and species' names in the GBA's encoding. The sum carries
+    // on from one Pokémon to the next, as the game's loop never resets it.
+    let nameHash = 0;
+    const withPersonality = party.map((m) => {
+      nameHash += encode(name).reduce((a, b) => a + b, 0);
+      nameHash += encode(speciesNames()[m.species]).reduce((a, b) => a + b, 0);
+      const base = double ? 0x80 : female ? 0x78 : 0x88;
+      return { ...m, personality: (base + (nameHash << 8)) >>> 0 };
+    });
     out[id] = {
-      name: t.trainerName.match(/_\("([^"]*)"\)/)[1],
+      name,
       class: cls,
       className: classNames[cls] ?? '',
-      female: music.includes('F_TRAINER_FEMALE'),
-      double: t.doubleBattle === 'TRUE',
+      female,
+      double,
       items: (t.items.match(/\{([^}]*)\}/)?.[1] ?? '').split(',').map((s) => s.trim()).filter((s) => s && s !== 'ITEM_NONE'),
       ai: t.aiFlags.split('|').map((s) => s.trim()).filter((s) => s !== '0'),
-      party,
+      party: withPersonality,
       money: money[cls] ?? money.default,
       pic: t.trainerPic,
       music: {

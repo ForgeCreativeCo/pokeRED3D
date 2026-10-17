@@ -5,6 +5,18 @@
 
 import type { PokemonFile, Species, StatKey, Stats } from '../data/types';
 
+/**
+ * A lasting status (status1 in the decomp): it stays after battle. Sleep
+ * counts down the turns left; badly poisoned (toxic) worsens each turn in battle.
+ */
+export type MajorStatus =
+  | { kind: 'sleep'; turns: number }
+  | { kind: 'poison' }
+  | { kind: 'toxic' }
+  | { kind: 'burn' }
+  | { kind: 'freeze' }
+  | { kind: 'paralysis' };
+
 export interface MonMove {
   move: string;
   pp: number;
@@ -28,6 +40,8 @@ export interface Mon {
   stats: Stats;
   friendship: number;
   metLevel: number;
+  /** absent when healthy */
+  status?: MajorStatus;
 }
 
 export const STAT_KEYS: StatKey[] = ['hp', 'atk', 'def', 'spe', 'spa', 'spd'];
@@ -111,12 +125,18 @@ const roll16 = (rng: () => number) => Math.floor(rng() * 0x10000);
  * `rng` returns numbers in [0, 1).
  */
 export function createMon(data: PokemonFile, species: string, level: number, rng: () => number, ot: { id: number; name: string }): Mon {
-  const sp = data.species[species];
-  if (!sp) throw new Error(`No species ${species}`);
+  if (!data.species[species]) throw new Error(`No species ${species}`);
   const personality = ((roll16(rng) << 16) | roll16(rng)) >>> 0;
   // IVs come from two 16-bit rolls, five bits each.
   const a = roll16(rng), b = roll16(rng);
   const ivs: Stats = { hp: a & 31, atk: (a >> 5) & 31, def: (a >> 10) & 31, spe: b & 31, spa: (b >> 5) & 31, spd: (b >> 10) & 31 };
+  return buildMon(data, species, level, personality, ivs, ot);
+}
+
+/** A Pokémon with a given personality and IVs, as CreateMon makes it once those are chosen. */
+export function buildMon(data: PokemonFile, species: string, level: number, personality: number, ivs: Stats, ot: { id: number; name: string }): Mon {
+  const sp = data.species[species];
+  if (!sp) throw new Error(`No species ${species}`);
   const mon: Mon = {
     species, nickname: null, level, exp: expForLevel(sp.growth, level), personality,
     otId: ot.id >>> 0, otName: ot.name, ivs, evs: zeroStats(),

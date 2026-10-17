@@ -81,9 +81,10 @@ for stats.
 ## Conventions that matter
 
 - **Random numbers come in separate streams** (`src/core/random.ts`):
-  `random` for people wandering, `monRandom` for new Pokémon. Give battles
-  their **own stream**, seeded from the same `?seed=`, so a battle roll can
-  never shift where people wander or what a new Pokémon rolls. That's what
+  `random` for people wandering, `monRandom` for new Pokémon, `battleRandom`
+  for battles, all seeded from the same `?seed=`, so a battle roll can
+  never shift where people wander or what a new Pokémon rolls. Pass
+  `battleRandom` as the `Battle`'s `rng`. That's what
   keeps the recorded play-throughs stable.
 - **Play-throughs are the regression net.** `tests/playthrough/*.json` are
   scripted runs; `golden/*.json` are their transcripts. When a change is
@@ -122,15 +123,52 @@ running `npm run dev` first. To publish the test page,
 `npm run build:artifact` writes `dist-single/pokered3d.html` for the
 Artifact.
 
+## The battle engine
+
+`src/battle/rules.ts` holds the formulas, each citing its decomp function;
+`src/battle/battle.ts` runs a single battle with them. The screen drives it:
+
+```ts
+const battle = new Battle({ pokemon, battle, party: story.party, playerId, foe: { trainer: 'TRAINER_RIVAL_OAKS_LAB_SQUIRTLE' }, rng: battleRandom });
+battle.start();                          // events: the foe and your Pokémon come out
+battle.turn({ type: 'move', slot: 0 });  // or { type: 'switch', party } / { type: 'run' }
+// battle.phase: 'action' (choose again), 'switch' (call switchIn, or flee in the wild), 'over'
+// battle.pendingMoves: answer each 'learn-prompt' with learnMove(slot to forget | null)
+```
+
+Every call returns events (`move`, `damage` with crit and effectiveness,
+`miss`, `stat`, `status`, `cant-move`, `faint`, `exp`, `level-up`,
+`learn-prompt`, `end` with prize money, …) for the screen to show in order,
+as text, HP bars and animations. The engine changes the party in place: HP,
+PP, status (`Mon.status`, kept after battle), experience, EVs, level, moves.
+
+What's in: damage with stat stages, crits, STAB, the type chart and the
+random factor; accuracy and evasion; priority and speed order; the attack
+cancellers (sleep, freeze, flinch, confusion, paralysis); poison, bad poison,
+burn and Leech Seed at the end of the turn; stat moves and the stat-change
+side effects of hits; status moves and the status side effects of hits, with
+type and ability immunities; draining, recoil and Struggle; fainting,
+experience split among the Pokémon that fought (x1.5 from trainers and for
+traded ones), EVs, level-ups and new moves; running (never from a trainer);
+prize money, and the money lost on a whiteout (`whiteOutLoss`). Trainer
+Pokémon are made as `CreateNPCTrainerParty` makes them, with the fixed
+personality the baker works out.
+
+Not yet: double battles (Route 21 North's Lil & Ian), held items, weather,
+using items in battle, catching, the "Will you switch?" prompt when a
+trainer sends out the next one, trainers' AI (they pick a move at random,
+like wild Pokémon), the first battle's tutorial rules (`RIVAL_BATTLE_TUTORIAL`:
+for step 4), and move effects beyond the early game's: an unknown effect on a
+damaging move still hits, and an unknown status move fails. `isHandled`
+says which effects are in.
+
 ## Suggested order
 
 1. ~~**Bake** the type chart, Route 1's FireRed encounters, Blue's lab parties,
    battle backgrounds, battle music and the extra Pokémon pictures.~~ Done.
    Battle text is still to bake, with the battle screen.
-2. **Battle logic** in `src/battle/`, as pure code: turn order, damage,
-   accuracy, crits, the starters' and Route 1's move effects, fainting,
-   experience and levelling. Unit-test the formulas against hand-worked
-   numbers.
+2. ~~**Battle logic** in `src/battle/`, as pure code.~~ Done: see "The battle
+   engine" below.
 3. **The battle screen**, in FireRed's layout: the two Pokémon on their
    platforms, HP boxes, FIGHT / BAG / POKéMON / RUN, the move list with PP and
    type, battle text through the existing text box.

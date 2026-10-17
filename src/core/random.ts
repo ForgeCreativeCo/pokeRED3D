@@ -3,9 +3,10 @@
 // objects it makes depends on the bundle. ?seed=<n> in the page URL makes a
 // run reproducible.
 //
-// There are two streams, so one system's rolls can't move another's: people's
-// wander timers and directions use `random`, and new Pokémon (IVs, nature,
-// personality) use `monRandom`.
+// There are three streams, so one system's rolls can't move another's: people's
+// wander timers and directions use `random`, new Pokémon (IVs, nature,
+// personality) use `monRandom`, and battles (hits, damage, turn order) use
+// `battleRandom`.
 
 /** mulberry32: small, fast, and good enough for both. */
 function stream(seed: number) {
@@ -21,11 +22,14 @@ function stream(seed: number) {
 
 let wander: () => number = Math.random;
 let mons: () => number = Math.random;
+let battles: () => number = Math.random;
 
 export const random = () => wander();
 export const monRandom = () => mons();
+export const battleRandom = () => battles();
 
 export function seedRandom(seed: number) {
   wander = stream(seed);
   mons = stream(seed ^ 0x9e3779b9);
+  battles = stream(seed ^ 0x85ebca6b);
 }

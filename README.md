@@ -122,14 +122,15 @@ loads the baked files (`build/data/*.json` and each map's `map.json` and
 | `scripts/` | Story state (flags, variables, party, Bag, money, Pokédex, time, options), and the player for the decomp's event and map scripts |
 | `items/` | The Bag: pockets, stacks, FireRed's limits |
 | `save/` | Saving and loading the story and where you stand, in browser storage |
-| `pokemon/` | Pokémon as FireRed keeps them: creating one, stats, experience, nature, gender, ability, starting moves |
+| `pokemon/` | Pokémon as FireRed keeps them: creating one, stats, experience, nature, gender, ability, starting moves, status |
+| `battle/` | Battles as FireRed runs them, as pure logic: damage, types, accuracy, critical hits, turn order, move effects, status, experience and level-ups, running; each turn comes back as events for the battle screen |
 | `ui/` | The text box and YES/NO, emotes, the Pokémon picture window, the start menu and its screens (party, summaries, Bag, trainer card, OPTION, Pokédex), the Continue screen, the tuning panel |
 | `audio/` | The synth that plays FireRed's songs |
 | `input/` | Keyboard, d-pad and A button |
 | `render/` | The scene, the follow camera, and the GBA view for compare mode |
 | `game.ts` | Wires it together and runs the frame |
 
-World, character, script, Pokémon, Bag and save logic don't touch three.js or
+World, character, script, Pokémon, battle, Bag and save logic don't touch three.js or
 the page, so they run under unit tests.
 
 **The footprint principle** keeps it playable: anything raised in 3D covers
@@ -163,6 +164,8 @@ dist/, dist-single/    game builds (gitignored)
 `npm test` runs the unit tests: the world grid, people and wandering, the
 game clock, the script player, the Pokémon formulas (stats, natures,
 experience, starting moves, checked against values worked out by hand), the
+battle rules (damage, types, accuracy, crits, turn order, experience, escaping,
+also worked by hand) and whole battles against Blue's Squirtle and Pidgey, the
 Bag, and saving (a round trip, plus bad saves and storage that refuses), on
 small hand-made data, so they need no decomp.
 
@@ -217,7 +220,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
-| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · a. battle scene and UI · b. core mechanics ported from the decomp (damage, types, accuracy, status, experience) · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
+| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · a. battle scene and UI · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track

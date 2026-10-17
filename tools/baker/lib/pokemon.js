@@ -76,6 +76,7 @@ function load() {
       genderRatio: genderRatio(f.genderRatio),
       catchRate: num(f.catchRate),
       expYield: num(f.expYield),
+      evYield: { hp: num(f.evYield_HP), atk: num(f.evYield_Attack), def: num(f.evYield_Defense), spe: num(f.evYield_Speed), spa: num(f.evYield_SpAttack), spd: num(f.evYield_SpDefense) },
       friendship: num(f.friendship),
       learnset: learnsetOf[key] ?? [],
     };
