@@ -19,7 +19,7 @@ import { bakeSong } from './lib/music.js';
 import { bakeScripts } from './lib/scripts.js';
 import { bakePokemon } from './lib/pokemon.js';
 import { bakeItems, uiText, nationalDex } from './lib/items.js';
-import { bakeTypes, bakeWild, bakeTrainers, bakePlayerPics, bakeTerrains, bakeBattleText } from './lib/battle.js';
+import { bakeTypes, bakeWild, bakeTrainers, bakePlayerPics, bakeTerrains, bakeBattleText, bakeBallPics } from './lib/battle.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const OUT = path.join(ROOT, 'build');
@@ -116,7 +116,7 @@ const wild = bakeWild(world.map((w) => w.data.id));
 const terrains = bakeTerrains(['GRASS', 'LONG_GRASS', 'SAND', 'WATER', 'POND', 'MOUNTAIN', 'CAVE', 'BUILDING', 'PLAIN'].map((t) => `BATTLE_TERRAIN_${t}`));
 const battle = {
   format: { name: 'pokered3d-battle', version: 1 },
-  types: bakeTypes(), wild, trainers, trainerPics, playerPics: bakePlayerPics(), terrains, ...bakeBattleText(),
+  types: bakeTypes(), wild, trainers, trainerPics, playerPics: bakePlayerPics(), ballPics: bakeBallPics(), terrains, ...bakeBattleText(),
   // Wild battles: GetBattleBGM, Cmd_getexp's victory, and catching (battle_anim_special.c, sText_GotchaPkmnCaught).
   music: { wild: 'MUS_VS_WILD', wildVictory: 'MUS_VICTORY_WILD', caughtIntro: 'MUS_CAUGHT_INTRO', caught: 'MUS_CAUGHT' },
 };
@@ -158,6 +158,8 @@ Object.assign(scripts.text, uiText([
   'gText_ChoosePokemon', 'gText_PkmnHasNoEnergy', 'gText_PkmnAlreadyInBattle', 'gText_WhichMoveToForget',
   // waking up at home after a whiteout
   'gText_PlayerScurriedBackHome',
+  // the Bag in battle
+  'gText_PkmnHPRestoredByVar2', 'gText_WontHaveEffect',
 ]));
 console.log(`Items: ${Object.keys(items.items).length}; a new game starts with ${items.startMoney} money`);
 console.log(`Pokémon: ${Object.keys(pokemon.species).length} species, ${Object.keys(pokemon.moves).length} moves; pictures of ${Object.keys(pokemon.pics).join(', ') || 'none'}`);

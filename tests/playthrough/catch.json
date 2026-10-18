@@ -1,0 +1,15 @@
+[
+  ["give","SPECIES_SQUIRTLE",5],
+  ["giveItem","ITEM_POKE_BALL",10],
+  ["giveItem","ITEM_POTION",1],
+  ["go","Route1",10,6],
+  ["wander"],
+  ["advance"],
+  ["press","right"],
+  ["press","a"],
+  ["press","a"],
+  ["press","a"],
+  ["advance"],
+  ["catch"],
+  ["box"]
+]

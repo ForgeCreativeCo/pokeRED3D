@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Bag, MAX_STACK, POCKET_SLOTS } from '../../src/items/bag';
 import type { ItemData } from '../../src/data/types';
 
-const item = (name: string, pocket: ItemData['pocket'] = 'ITEMS'): ItemData => ({ name, price: 100, pocket, description: '', param: 0, fieldUse: null, important: pocket === 'KEY_ITEMS' });
+const item = (name: string, pocket: ItemData['pocket'] = 'ITEMS'): ItemData => ({ name, price: 100, pocket, description: '', param: 0, fieldUse: null, battleUse: null, important: pocket === 'KEY_ITEMS' });
 const items: Record<string, ItemData> = {
   ITEM_POTION: item('POTION'), ITEM_ANTIDOTE: item('ANTIDOTE'),
   ITEM_POKE_BALL: item('POKé BALL', 'POKE_BALLS'), ITEM_OAKS_PARCEL: item("OAK'S PARCEL", 'KEY_ITEMS'),

@@ -1,4 +1,4 @@
-// Saving and loading: the story (flags, variables, party, Bag, money,
+// Saving and loading: the story (flags, variables, party, PC box, Bag, money,
 // Pokédex, time, options) and where the player stands, as JSON in the
 // browser's storage. Storage can be missing or refuse writes (a private
 // window, blocked site data), so every access is guarded and reports whether
@@ -25,6 +25,8 @@ export interface SaveFile {
     flags: string[];
     vars: Record<string, Value>;
     party: Mon[];
+    /** the PC box (older saves have none) */
+    box?: Mon[];
     bag: Partial<Record<Pocket, Stack[]>>;
     money: number;
     dex: { seen: string[]; caught: string[] };
@@ -46,6 +48,7 @@ export function makeSave(story: Story, location: SaveFile['location'], now = Dat
       // Temporary vars belong to the map you're on and are cleared on load anyway.
       vars: Object.fromEntries(Object.entries(story.vars).filter(([k]) => !k.startsWith('VAR_TEMP_'))),
       party: structuredClone(story.party),
+      box: structuredClone(story.box),
       bag: structuredClone(story.bag.toJSON()),
       money: story.money,
       dex: { seen: [...story.dex.seen].sort(), caught: [...story.dex.caught].sort() },
@@ -65,6 +68,7 @@ export function applySave(story: Story, save: SaveFile) {
   Object.assign(story.vars, s.vars);
   Object.assign(story.names, s.names);
   story.party.splice(0, story.party.length, ...structuredClone(s.party));
+  story.box.splice(0, story.box.length, ...structuredClone(s.box ?? []));
   story.bag.load(s.bag);
   story.money = s.money;
   story.dex.seen.clear(); story.dex.caught.clear();

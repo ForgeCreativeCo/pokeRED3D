@@ -36,7 +36,7 @@ export interface ScriptHost {
   areaActors(): Actor[];
   warpTo(dest: LoadedMap, x: number, y: number, arrive?: string | null): Promise<void>;
   /** a trainer battle; resolves how it ended. Texts are script text labels. */
-  battle(foe: { trainer: string }, opts: { loseText?: string; winText?: string; firstBattle?: boolean; healAfter?: boolean }): Promise<'won' | 'lost' | 'ran'>;
+  battle(foe: { trainer: string }, opts: { loseText?: string; winText?: string; firstBattle?: boolean; healAfter?: boolean }): Promise<'won' | 'lost' | 'ran' | 'caught'>;
   /** HealPlayerParty */
   healParty(): void;
   /** losing a battle that isn't Blue's in the lab: money lost, healed, home */

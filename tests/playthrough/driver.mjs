@@ -111,6 +111,33 @@ export async function play(steps, { url, seed = 1 }) {
           }
           if ((await call('battleState')) !== 'closed') break;
         }
+      } else if (method === 'catch') {
+        // ['catch', max]: in a wild battle, open the BAG and throw a POKé BALL
+        // every turn, decline a nickname, and read every message, until the
+        // battle is over.
+        const [max = 600] = args;
+        const said = [];
+        let last = null;
+        for (let i = 0; i < max; i++) {
+          const b = await call('battleState');
+          if (b === 'closed') break;
+          if (/^battle menu/.test(b) && !(await call('bag')).some((x) => x.includes('POKé BALL'))) break; // none left to throw
+          if (/^battle menu FIGHT/.test(b)) { await call('press', 'right', 0.1); continue; }
+          if (/^battle menu BAG/.test(b)) { await call('press', 'a', 0.2); continue; }
+          if (/^battle bag POKé BALL/.test(b)) { await call('press', 'a', 0.2); last = null; continue; }
+          if (/^battle bag/.test(b)) { await call('press', 'down', 0.1); continue; }
+          if ((await state()).choosing) { await call('press', 'b', 0.3); continue; }
+          const t = await call('battleText');
+          if (t && t === last) {
+            if (t !== said.at(-1)) said.push(t);
+            await call('press', 'a', 0.1);
+            last = null;
+          } else {
+            last = t;
+            await call('tick', 0.2);
+          }
+        }
+        entry.said = said;
       } else if (method === 'fight') {
         // ['fight', max]: in a battle, choose FIGHT and the first move every
         // turn, send out the next Pokémon when one faints, and read every

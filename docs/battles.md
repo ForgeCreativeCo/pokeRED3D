@@ -155,7 +155,7 @@ Pokémon are made as `CreateNPCTrainerParty` makes them, with the fixed
 personality the baker works out.
 
 Not yet: double battles (Route 21 North's Lil & Ian), held items, weather,
-using items in battle, catching, the "Will you switch?" prompt when a
+status medicine in battle, the "Will you switch?" prompt when a
 trainer sends out the next one, trainers' AI (they pick a move at random,
 like wild Pokémon), and move effects beyond the early game's: an unknown effect on a
 damaging move still hits, and an unknown status move fails. `isHandled`
@@ -186,7 +186,7 @@ on it like a script.
 - **Phones:** an on-screen B button now sits beside A, for backing out of
   menus.
 
-Not yet: the BAG (it says items can't be used now), the stat window on a
+Not yet: status medicine, the stat window on a
 level-up, the low-HP warning sound, move animations, a whiteout taking you
 home on a black screen. The test hook's `battle()` starts any battle where
 the player stands.
@@ -244,6 +244,25 @@ their turn, as `ProcessPlayerFieldInput` does.
   Mom, with "scurried back home" and `EventScript_AfterWhiteOutMomHeal`. Losing
   a `trainerbattle_single` whites out too.
 
+## Catching and the Bag in battle
+
+- **The Bag:** BAG lists the items whose decomp `battleUsage` lets them be
+  used in battle (`battleUse` in `items.json`), with their descriptions. A
+  ball is thrown at once; medicine asks which Pokémon it's for, and says "It
+  won't have any effect." (keeping the item) for a fainted or full-HP one.
+  Using an item takes the turn, before any move, as in FireRed.
+- **Catching** (`Cmd_handleballthrow`, in `rules.ts`): the odds from the
+  species' catch rate, the ball's bonus (Great, Ultra, Net, Nest, Repeat,
+  Timer, …), the HP left and the status; over 254 is a sure catch, otherwise
+  four checks against `1048560 / the fourth root of 16711680 / odds`. A trainer
+  blocks the ball ("Don't be a thief!").
+- **The screen:** the ball's own sprite (`ballPics`, from
+  `graphics/interface/ball`) shakes as many times as the checks passed, then
+  either "Gotcha!" with the caught fanfare, or one of FireRed's four breakout
+  lines. A catch registers in the Pokédex (with "data was added" once the
+  player has one), asks about a nickname (no naming screen yet), and joins
+  the party, or the PC box with a full party (`Story.box`, saved).
+
 ## Suggested order
 
 1. ~~**Bake** the type chart, Route 1's FireRed encounters, Blue's lab parties,
@@ -257,5 +276,5 @@ their turn, as `ProcessPlayerFieldInput` does.
    battles in scripts" below.
 5. ~~**Wild encounters** in Route 1's tall grass, with RUN.~~ Done: see "Wild
    encounters" below.
-6. **Catching** with POKé BALLs from the Bag, filling the Pokédex
-   (`Story.register`).
+6. ~~**Catching** with POKé BALLs from the Bag, filling the Pokédex.~~ Done: see
+   "Catching and the Bag in battle" below.

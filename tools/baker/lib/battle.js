@@ -181,6 +181,23 @@ function frontPic(picId) {
  * The player's back pictures (Red, Leaf): a strip of 64x64 frames, the
  * throwing animation, top to bottom.
  */
+/**
+ * Each ball's sprite (graphics/interface/ball/*.png, in its own palette): a
+ * 16x48 strip of three frames (closed, then tilted each way as it shakes),
+ * by item (ITEM_POKE_BALL, …), as gBallSpriteSheets lists them.
+ */
+export function bakeBallPics() {
+  const out = {};
+  for (const [, sym] of read('src/pokeball.c').matchAll(/\[BALL_\w+\]\s*=\s*\{(gBallGfx_\w+),/g)) {
+    const file = read('src/data/graphics/interface_pokeballs.h').match(new RegExp(`${sym}\\[\\]\\s*=\\s*INCBIN_U32\\("([^"]+)"\\)`))?.[1];
+    if (!file) continue;
+    const pngFile = png(file);
+    const palette = PNG.sync.read(fs.readFileSync(path.join(DECOMP_DIR, pngFile)), { skipRescale: true }).palette.map((c) => c.slice(0, 3));
+    out[`ITEM_${path.basename(pngFile, '.png').toUpperCase()}_BALL`] = recolor(pngFile, palette);
+  }
+  return out;
+}
+
 export function bakePlayerPics() {
   const { file } = trainerPics();
   const out = {};

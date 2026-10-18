@@ -25,6 +25,8 @@ export class Story {
   readonly names: Record<string, string> = { PLAYER: 'RED', RIVAL: 'BLUE' };
   /** up to six, in order */
   readonly party: Mon[] = [];
+  /** caught with a full party: sent to the PC (one box for now) */
+  readonly box: Mon[] = [];
   readonly bag: Bag;
   money = 0;
   /** species seen and caught, for the Pokédex */

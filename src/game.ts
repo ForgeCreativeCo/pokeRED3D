@@ -125,7 +125,7 @@ export class Game implements ScriptHost {
     this.textbox = new TextBox(this.clock, this.input, this.story, doc);
     this.battleData = data.battle;
     this.wild = new WildEncounters(data.battle);
-    this.battleScreen = new BattleScreen(this.clock, this.input, this.story, doc, data.pokemon, data.battle, this.music, data.scripts.text);
+    this.battleScreen = new BattleScreen(this.clock, this.input, this.story, doc, data.pokemon, data.battle, this.music, data.scripts.text, data.items.items);
     this.emote = new Emote(this.clock, doc);
     this.vm = new ScriptVM(data.scripts, this);
     this.rig = new CameraRig(data.maps, D.camera.preset, this.canvas);

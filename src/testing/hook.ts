@@ -76,6 +76,15 @@ export function installHook(game: Game) {
       await hook.tick(0.1);
       return hook.battleState();
     },
+    /** Put items in the Bag. */
+    giveItem(item: string, count = 1) {
+      game.story.bag.add(item, count);
+      return hook.bag();
+    },
+    /** The PC box: species and level. */
+    box() {
+      return game.story.box.map((m) => `${displayName(game.pokemon, m)} Lv${m.level}`);
+    },
     /** Add a Pokémon to the party, as givemon would. */
     give(species: string, level: number) {
       game.story.party.push(createMon(game.pokemon, species, level, monRandom, { id: game.story.trainerId, name: game.story.names.PLAYER }));

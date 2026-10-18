@@ -12,8 +12,8 @@ import type { Clock } from '../core/clock';
 import type { Input } from '../input/input';
 import type { Story } from '../scripts/story';
 import type { Music } from '../audio/music';
-import type { BattleFile, PokemonFile } from '../data/types';
-import { Battle, type BattleEvent, type Side } from '../battle/battle';
+import type { BattleFile, ItemData, PokemonFile } from '../data/types';
+import { Battle, type BattleEvent, type Outcome, type Side } from '../battle/battle';
 import { displayName, expForLevel, genderOf, type Mon } from '../pokemon/mon';
 import { TextBox } from './textbox';
 
@@ -33,9 +33,9 @@ export interface BattleStart {
   healAfter?: boolean;
 }
 
-export type BattleOutcome = 'won' | 'lost' | 'ran';
+export type BattleOutcome = Outcome;
 
-type Mode = 'text' | 'actions' | 'moves' | 'party' | 'forget' | 'yesno';
+type Mode = 'text' | 'actions' | 'moves' | 'party' | 'forget' | 'bag';
 
 const ACTIONS = ['FIGHT', 'BAG', 'POKéMON', 'RUN'];
 const STAT_INDEX: Record<string, number> = { atk: 1, def: 2, spe: 3, spa: 4, spd: 5, acc: 6, eva: 7 };
@@ -55,12 +55,15 @@ export class BattleScreen {
   private start: BattleStart | null = null;
   /** HP as the boxes show it while a bar drains */
   private shownHp: Record<Side, number> = { player: 0, foe: 0 };
+  /** the items the Bag list shows */
+  private bagList: string[] = [];
 
   constructor(
     private clock: Clock, private input: Input, private story: Story, doc: Document,
     private pokemon: PokemonFile, private data: BattleFile, private music: Music,
     /** the menus' own lines (scripts.json text): Choose a POKéMON., … */
     private ui: Record<string, string>,
+    private items: Record<string, ItemData>,
   ) {
     this.root = doc.getElementById('battle')!;
     this.root.innerHTML = `
@@ -70,6 +73,7 @@ export class BattleScreen {
         <div class="bmon player"><img alt=""></div>
         <div class="btrainer foe"><img alt=""></div>
         <div class="btrainer player"></div>
+        <div class="bball" hidden></div>
         <div class="hpbox foe"></div>
         <div class="hpbox player"></div>
         <div class="bmsg" role="status" aria-live="polite"><p></p><p></p><span class="more" hidden aria-hidden="true">▼</span></div>
@@ -90,6 +94,7 @@ export class BattleScreen {
     const battle = (this.battle = new Battle({
       pokemon: this.pokemon, battle: this.data, party: this.story.party, playerId: this.story.trainerId, foe: start.foe, rng: start.rng,
       firstBattle: start.firstBattle,
+      items: this.items, caughtBefore: (species) => this.story.dex.caught.has(species),
     }));
     const trainer = battle.trainer ? this.data.trainers[battle.trainer] : null;
     const before = this.music.current;
@@ -134,6 +139,7 @@ export class BattleScreen {
     if (this.mode === 'moves') return `battle moves ${this.moveName(b.mon('player').moves[this.sel]?.move)}`;
     if (this.mode === 'party') return `battle party ${displayName(this.pokemon, b.parties.player[this.sel])}`;
     if (this.mode === 'forget') return `battle forget ${this.sel}`;
+    if (this.mode === 'bag') return `battle bag ${this.items[this.bagList[this.sel]]?.name ?? ''}`;
     return `battle text ${this.tb.shown}`;
   }
 
@@ -179,6 +185,9 @@ export class BattleScreen {
         case 'B_TRAINER1_CLASS': return trainer?.className ?? '';
         case 'B_TRAINER1_NAME': return trainer ? this.trainerName() : '';
         case 'B_BUFF1': case 'B_BUFF2': case 'B_BUFF3': return String(buffs[k.slice(2)] ?? '');
+        case 'B_LAST_ITEM': return String(buffs.LAST_ITEM ?? '');
+        // "someone's PC" until the story meets BILL
+        case 'B_PC_CREATOR_NAME': return this.story.flags.has('FLAG_SYS_NOT_SOMEONES_PC') ? this.data.text.sText_Bills ?? "BILL's" : this.data.text.sText_Someones;
         default: return all;
       }
     });
@@ -402,13 +411,71 @@ export class BattleScreen {
         if (e.reason === 'trainer') await this.say(this.start?.firstBattle ? T.gText_OakNoRunningFromATrainer : T.sText_NoRunningFromTrainers);
         else await this.say(e.ok ? T.sText_GotAwaySafely : T.sText_CantEscape);
         break;
+      case 'item':
+        await this.say(this.line('sText_PlayerUsedItem', 'player', { LAST_ITEM: this.items[e.item]?.name ?? e.item }));
+        break;
+      case 'ball': await this.throwBall(e.item, e.shakes, !!e.blocked); break;
+      case 'restore': {
+        if (e.party === b.active.player.party) await this.animateHp('player');
+        this.story.names.STR_VAR_1 = displayName(this.pokemon, b.parties.player[e.party]);
+        this.story.names.STR_VAR_2 = String(e.amount);
+        await this.say(this.ui.gText_PkmnHPRestoredByVar2);
+        break;
+      }
       case 'need-switch': break;
       case 'end': await this.ending(e.outcome, e.money); break;
     }
   }
 
+  /**
+   * A ball at the foe: blocked by a trainer, or the foe drawn in and the ball
+   * shaking (each shake tilts it one way, then the other); three shakes and a
+   * click is a catch, fewer and the Pokémon breaks out (gBallEscapeStringIds).
+   */
+  private async throwBall(item: string, shakes: number, blocked: boolean) {
+    const T = this.data.text, ball = this.q('.bball'), foe = this.q('.bmon.foe');
+    ball.style.backgroundImage = `url(${this.data.ballPics[item] ?? this.data.ballPics.ITEM_POKE_BALL ?? ''})`;
+    ball.dataset.frame = '0';
+    ball.hidden = false;
+    await this.clock.delayFrames(20);
+    if (blocked) {
+      ball.hidden = true;
+      await this.say(T.sText_TrainerBlockedBall);
+      await this.say(T.sText_DontBeAThief);
+      return;
+    }
+    foe.classList.add('out');
+    await this.clock.delayFrames(30);
+    for (let i = 0; i < Math.min(shakes, 3); i++) {
+      for (const [frame, n] of [['1', 10], ['0', 6], ['2', 10], ['0', 24]] as const) { ball.dataset.frame = frame; await this.clock.delayFrames(n); }
+    }
+    if (shakes === 4) { this.music.play(this.data.music.caughtIntro); return; }
+    ball.hidden = true;
+    foe.classList.remove('out');
+    await this.say([T.sText_PkmnBrokeFree, T.sText_ItAppearedCaught, T.sText_AarghAlmostHadIt, T.sText_ShootSoClose][shakes]);
+  }
+
   private async ending(outcome: BattleOutcome, money?: number) {
     const b = this.battle!;
+    if (outcome === 'caught') {
+      // BattleScript_SuccessBallThrow: "Gotcha!", the Pokédex, a nickname, the party or the PC.
+      const mon = b.mon('foe');
+      this.music.play(this.data.music.caught);
+      await this.say(this.line('sText_GotchaPkmnCaught', 'foe'));
+      const isNew = !this.story.dex.caught.has(mon.species);
+      this.story.register(mon.species, true);
+      if (isNew && this.story.flags.has('FLAG_SYS_POKEDEX_GET')) await this.say(this.line('sText_PkmnDataAddedToDex', 'foe'));
+      // There's no naming screen yet: the answer keeps the species name either way.
+      await this.tb.say(stripCodes(this.line('sText_GiveNicknameCaptured', 'foe')), { wait: false });
+      await this.tb.yesNo();
+      this.q('.bball').hidden = true;
+      if (this.story.party.length < 6) this.story.party.push(mon);
+      else {
+        this.story.box.push(mon);
+        await this.say(this.line('sText_PkmnSentToPC', 'foe') + '\\p');
+      }
+      return;
+    }
     if (outcome === 'won' && b.trainer) {
       this.music.play(this.data.trainers[b.trainer].music.victory);
       const tr = this.q('.btrainer.foe');
@@ -460,12 +527,34 @@ export class BattleScreen {
       if (moves[slot].pp === 0) { await this.say(this.data.text.sText_NoPPLeft); return null; }
       return { type: 'move', slot };
     }
-    if (action === 'BAG') { await this.say(this.data.text.sText_ItemsCantBeUsedNow); return null; }
+    if (action === 'BAG') return this.chooseItem();
     if (action === 'POKéMON') {
       const party = await this.pickPartyMon(true);
       return party === null ? null : { type: 'switch', party };
     }
     return { type: 'run' };
+  }
+
+  /** The Bag: the items that work in battle. A ball is thrown; medicine asks who it's for. */
+  private async chooseItem(): Promise<Parameters<Battle['turn']>[0] | null> {
+    const b = this.battle!, pockets = this.story.bag.pockets;
+    const list = (['ITEMS', 'POKE_BALLS'] as const).flatMap((p) => (pockets[p] ?? []).map((s) => s.item)).filter((i) => this.items[i]?.battleUse);
+    if (!list.length) { await this.say(this.data.text.sText_ItemsCantBeUsedNow); return null; }
+    this.bagList = list;
+    const pick = await this.menu('bag', list.length, 0);
+    if (pick === null) return null;
+    const item = list[pick], data = this.items[item];
+    if (data.battleUse === 'BattleUseFunc_PokeBallEtc') {
+      if (this.story.party.length >= 6 && this.story.box.length >= 30) { await this.say(this.data.text.sText_BoxIsFull); return null; }
+      this.story.bag.remove(item, 1);
+      return { type: 'item', item };
+    }
+    const slot = await this.menu('party', b.parties.player.length, b.active.player.party);
+    if (slot === null) return null;
+    const m = b.parties.player[slot];
+    if (!(data.param > 0) || m.hp === 0 || m.hp >= m.stats.hp) { await this.say(this.ui.gText_WontHaveEffect); return null; }
+    this.story.bag.remove(item, 1);
+    return { type: 'item', item, party: slot };
   }
 
   /** After your Pokémon faints: in the wild, "Use next POKéMON?" first; then pick one. */
@@ -580,10 +669,14 @@ export class BattleScreen {
         ? `<span class="pp${low}">${this.data.text.gText_MoveInterfacePP ?? 'PP '}${m.pp}/${data?.pp ?? 0}</span><span>${this.data.text.gText_MoveInterfaceType ?? 'TYPE/'}${this.data.types.names[data?.type ?? ''] ?? ''}</span>` : '';
       el.hidden = false;
       this.tb.close();
-    } else if (this.mode === 'party' || this.mode === 'forget') {
+    } else if (this.mode === 'party' || this.mode === 'forget' || this.mode === 'bag') {
       const el = this.q('.bparty');
-      el.classList.toggle('forget', this.mode === 'forget');
-      if (this.mode === 'party') {
+      el.classList.toggle('forget', this.mode !== 'party');
+      if (this.mode === 'bag') {
+        const desc = this.items[this.bagList[this.sel]]?.description ?? '';
+        el.innerHTML = `<ul>${this.bagList.map((it, i) => `<li${sel(i)}><span class="name">${esc(this.items[it]?.name ?? it)}</span><span class="lv"></span><span class="hpnum">×${this.story.bag.count(it)}</span></li>`).join('')}</ul>`
+          + `<p class="bdesc">${esc(desc.replace(/\\n/g, ' '))}</p>`;
+      } else if (this.mode === 'party') {
         el.innerHTML = `<p class="bprompt">${esc(stripCodes(this.ui.gText_ChoosePokemon))}</p><ul>${b.parties.player.map((m, i) => `<li${sel(i)}>`
           + `<span class="name">${esc(displayName(this.pokemon, m))}</span><span class="lv">Lv${m.level}</span>`
           + `<span class="hpbar"><b>HP</b><span class="track"><span class="fill ${hpClass(m.hp, m.stats.hp)}" style="width:${(m.hp / m.stats.hp) * 100}%"></span></span></span>`

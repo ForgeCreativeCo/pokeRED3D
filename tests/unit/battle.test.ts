@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Battle, statEffect, trainerMon, type BattleEvent } from '../../src/battle/battle';
 import {
-  applyStage, baseDamage, bGoesFirst, effectiveness, escapes, expGained, finalDamage, gainEvs, hitChance, hits, isCrit,
+  applyStage, ballBonus, ballShakes, baseDamage, bGoesFirst, catchOdds, effectiveness, escapes, expGained, finalDamage, gainEvs, hitChance, hits, isCrit,
   noStages, prizeMoney, typeMultipliers, whiteOutLoss, type Fighter,
 } from '../../src/battle/rules';
 import { buildMon, type Mon } from '../../src/pokemon/mon';
@@ -84,7 +84,7 @@ const battleData: BattleFile = {
       money: 4, pic: 'TRAINER_PIC_RIVAL_EARLY', music: { encounter: '', battle: '', victory: '' },
     },
   },
-  trainerPics: {}, playerPics: {}, terrains: {}, music: { wild: '', wildVictory: '', caughtIntro: '', caught: '' }, text: {}, statNames: [],
+  trainerPics: {}, playerPics: {}, ballPics: {}, terrains: {}, music: { wild: '', wildVictory: '', caughtIntro: '', caught: '' }, text: {}, statNames: [],
 };
 
 const PLAYER = { id: 0x12345678, name: 'RED' };
@@ -362,5 +362,68 @@ describe('the first battle', () => {
     // After that, the usual rules: the same roll misses.
     expect(battle.turn({ type: 'move', slot: 0 })).toContainEqual({ type: 'miss', side: 'player' });
     expect(types(battle.turn({ type: 'move', slot: 1 }))).toContain('oak');
+  });
+});
+
+describe('catching', () => {
+  it('works out the odds as Cmd_handleballthrow does', () => {
+    // A level 3 Pidgey (15 HP, catch rate 255) in a Poké Ball: 255 x (45 - 30) / 45 = 85.
+    expect(catchOdds(255, 10, 15, 15, null)).toBe(85);
+    // At 1 HP: 255 x 43 / 45 = 243. Asleep as well: 486, a sure catch.
+    expect(catchOdds(255, 10, 15, 1, null)).toBe(243);
+    expect(catchOdds(255, 10, 15, 1, { kind: 'sleep', turns: 2 })).toBe(486);
+    expect(catchOdds(255, 10, 15, 15, { kind: 'poison' })).toBe(127);
+    // Bulbasaur (45) in an Ultra Ball at full HP: 90 x 1/3 = 30.
+    expect(catchOdds(45, 20, 21, 21, null)).toBe(30);
+  });
+  it('shakes against 1048560 / the fourth root of 16711680 / odds', () => {
+    // 85: 16711680 / 85 = 196608, root 443, root 21, 1048560 / 21 = 49931.
+    expect(ballShakes(85, () => 49930)).toBe(4);
+    let i = 0; const r = [0, 0, 49931];
+    expect(ballShakes(85, () => r[i++])).toBe(2);
+    expect(ballShakes(255, () => 65535)).toBe(4);
+  });
+  it('gives each ball its bonus', () => {
+    const pidgey = { types: ['TYPE_NORMAL', 'TYPE_FLYING'], level: 3 };
+    const opts = { caughtBefore: false, turns: 0, underwater: false };
+    expect(ballBonus('ITEM_POKE_BALL', pidgey, opts)).toBe(10);
+    expect(ballBonus('ITEM_GREAT_BALL', pidgey, opts)).toBe(15);
+    expect(ballBonus('ITEM_NEST_BALL', pidgey, opts)).toBe(37);
+    expect(ballBonus('ITEM_NET_BALL', { types: ['TYPE_WATER'], level: 5 }, opts)).toBe(30);
+    expect(ballBonus('ITEM_TIMER_BALL', pidgey, { ...opts, turns: 35 })).toBe(40);
+    expect(ballBonus('ITEM_REPEAT_BALL', pidgey, { ...opts, caughtBefore: true })).toBe(30);
+  });
+
+  const items = {
+    ITEM_POKE_BALL: { name: 'POKé BALL', price: 200, pocket: 'POKE_BALLS', description: '', param: 0, fieldUse: null, battleUse: 'BattleUseFunc_PokeBallEtc', important: false },
+    ITEM_POTION: { name: 'POTION', price: 300, pocket: 'ITEMS', description: '', param: 20, fieldUse: 'FieldUseFunc_Medicine', battleUse: 'BattleUseFunc_Medicine', important: false },
+  } as const;
+
+  it('catches a wild Pokémon, ending the battle', () => {
+    const pidgey = buildMon(pokemon, 'SPECIES_PIDGEY', 3, 0, ev0, { id: 1, name: '' });
+    const battle = new Battle({ pokemon, battle: battleData, party: [bulbasaur()], playerId: PLAYER.id, foe: { wild: pidgey }, rng: rolls(0), items: { ...items } });
+    expect(battle.turn({ type: 'item', item: 'ITEM_POKE_BALL' })).toEqual([
+      { type: 'item', item: 'ITEM_POKE_BALL' }, { type: 'ball', item: 'ITEM_POKE_BALL', shakes: 4 }, { type: 'end', outcome: 'caught' },
+    ]);
+    expect(battle.outcome).toBe('caught');
+  });
+  it('lets it break free, and the foe moves', () => {
+    const pidgey = buildMon(pokemon, 'SPECIES_PIDGEY', 3, 0, ev0, { id: 1, name: '' });
+    const battle = new Battle({ pokemon, battle: battleData, party: [bulbasaur()], playerId: PLAYER.id, foe: { wild: pidgey }, rng: rolls(65535, 1), items: { ...items } });
+    const ev = battle.turn({ type: 'item', item: 'ITEM_POKE_BALL' });
+    expect(ev[1]).toEqual({ type: 'ball', item: 'ITEM_POKE_BALL', shakes: 0 });
+    expect(ev[2]).toEqual({ type: 'move', side: 'foe', move: 'MOVE_TACKLE' });
+    expect(battle.phase).toBe('action');
+  });
+  it("can't catch a trainer's Pokémon", () => {
+    const battle = new Battle({ pokemon, battle: battleData, party: [bulbasaur()], playerId: PLAYER.id, foe: { trainer: 'TRAINER_RIVAL_OAKS_LAB_SQUIRTLE' }, rng: rolls(1), items: { ...items } });
+    expect(battle.turn({ type: 'item', item: 'ITEM_POKE_BALL' })[1]).toEqual({ type: 'ball', item: 'ITEM_POKE_BALL', blocked: true, shakes: 0 });
+  });
+  it('heals with a Potion, up to max HP', () => {
+    const b = bulbasaur();
+    b.hp = 10;
+    const pidgey = buildMon(pokemon, 'SPECIES_PIDGEY', 3, 0, ev0, { id: 1, name: '' });
+    const battle = new Battle({ pokemon, battle: battleData, party: [b], playerId: PLAYER.id, foe: { wild: pidgey }, rng: rolls(1), items: { ...items } });
+    expect(battle.turn({ type: 'item', item: 'ITEM_POTION', party: 0 })[1]).toEqual({ type: 'restore', party: 0, amount: 11, hp: 21 });
   });
 });

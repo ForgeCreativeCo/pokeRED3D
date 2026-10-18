@@ -4,7 +4,7 @@ import { Story } from '../../src/scripts/story';
 import type { ItemData } from '../../src/data/types';
 import type { Mon } from '../../src/pokemon/mon';
 
-const items: Record<string, ItemData> = { ITEM_POTION: { name: 'POTION', price: 300, pocket: 'ITEMS', description: '', param: 20, fieldUse: null, important: false } };
+const items: Record<string, ItemData> = { ITEM_POTION: { name: 'POTION', price: 300, pocket: 'ITEMS', description: '', param: 20, fieldUse: null, battleUse: null, important: false } };
 const mon = { species: 'SPECIES_BULBASAUR', nickname: null, level: 5, exp: 135, personality: 23, otId: 20826, otName: 'RED', ivs: { hp: 1, atk: 2, def: 3, spe: 4, spa: 5, spd: 6 }, evs: { hp: 0, atk: 0, def: 0, spe: 0, spa: 0, spd: 0 }, moves: [{ move: 'MOVE_TACKLE', pp: 35 }], hp: 20, stats: { hp: 20, atk: 9, def: 10, spe: 11, spa: 10, spd: 13 }, friendship: 70, metLevel: 5 } as Mon;
 
 /** A story partway through: a starter, a Potion, some flags and vars. */
@@ -14,6 +14,7 @@ function played() {
   s.vars.VAR_MAP_SCENE_PALLET_TOWN_OAK = 1;
   s.vars.VAR_TEMP_1 = 7; // map-local: not saved
   s.party.push(structuredClone(mon));
+  s.box.push({ ...structuredClone(mon), level: 3 });
   s.bag.add('ITEM_POTION');
   s.register('SPECIES_BULBASAUR', true);
   s.register('SPECIES_CHARMANDER', false);
@@ -39,12 +40,22 @@ describe('saving', () => {
     expect([...fresh.flags].sort()).toEqual(['FLAG_HIDE_OAK_IN_PALLET_TOWN', 'FLAG_SYS_POKEMON_GET']);
     expect(fresh.vars).toEqual({ VAR_MAP_SCENE_PALLET_TOWN_OAK: 1 });
     expect(fresh.party).toEqual([mon]);
+    expect(fresh.box.map((m) => m.level)).toEqual([3]);
     expect(fresh.bag.count('ITEM_POTION')).toBe(1);
     expect(fresh.money).toBe(3500);
     expect([...fresh.dex.seen].sort()).toEqual(['SPECIES_BULBASAUR', 'SPECIES_CHARMANDER']);
     expect([...fresh.dex.caught]).toEqual(['SPECIES_BULBASAUR']);
     expect(fresh.playTime).toBe(3725);
     expect(fresh.options.textSpeed).toBe('FAST');
+  });
+
+  it('loads an older save that has no PC box', () => {
+    const save = makeSave(played(), { map: 'PalletTown', x: 0, y: 0, facing: 'down' });
+    delete save.story.box;
+    const fresh = new Story([], 0, items, 3000);
+    fresh.box.push(structuredClone(mon));
+    applySave(fresh, save);
+    expect(fresh.box).toEqual([]);
   });
 
   it('copies the party, so later changes in the game don\'t reach the save', () => {

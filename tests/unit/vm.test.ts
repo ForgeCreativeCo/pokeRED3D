@@ -24,7 +24,7 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
   const pics: string[] = [];
   const battles: { foe: { trainer: string }; opts: object }[] = [];
   const healed: number[] = [];
-  const item = (name: string, pocket: ItemData['pocket'] = 'ITEMS'): ItemData => ({ name, price: 300, pocket, description: '', param: 20, fieldUse: null, important: pocket === 'KEY_ITEMS' });
+  const item = (name: string, pocket: ItemData['pocket'] = 'ITEMS'): ItemData => ({ name, price: 300, pocket, description: '', param: 20, fieldUse: null, battleUse: null, important: pocket === 'KEY_ITEMS' });
   const items = { ITEM_POTION: item('POTION'), ITEM_OAKS_PARCEL: item("OAK'S PARCEL", 'KEY_ITEMS') };
   const pokemon = {
     species: { SPECIES_BULBASAUR: { name: 'BULBASAUR', base: { hp: 45, atk: 49, def: 49, spe: 45, spa: 65, spd: 65 }, types: ['TYPE_GRASS'], abilities: ['ABILITY_OVERGROW'], growth: 'GROWTH_MEDIUM_SLOW', genderRatio: 31, catchRate: 45, expYield: 64, friendship: 70, learnset: [[1, 'MOVE_TACKLE']] } },

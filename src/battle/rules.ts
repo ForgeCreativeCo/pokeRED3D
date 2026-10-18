@@ -230,3 +230,51 @@ export const prizeMoney = (lastLevel: number, factor: number, double: boolean) =
 const WHITE_OUT_MULTIPLIERS = [2, 4, 6, 9, 12, 16, 20, 25, 30];
 /** ComputeWhiteOutMoneyLoss: the highest level in the party x 4 x the badge factor, up to all your money. */
 export const whiteOutLoss = (highestLevel: number, badges: number, money: number) => Math.min(money, highestLevel * 4 * WHITE_OUT_MULTIPLIERS[Math.min(8, badges)]);
+
+// ---- catching (Cmd_handleballthrow) ----
+
+/** The BIOS Sqrt the game calls: the integer square root, rounded down. */
+const isqrt = (n: number) => Math.floor(Math.sqrt(n));
+
+/**
+ * A ball's catch bonus, x10 (sBallCatchBonuses and the special balls): Ultra
+ * 20, Great 15, Poké 10; Net x3 on Water and Bug; Nest better the lower the
+ * level; Repeat x3 on a species caught before; Timer up with the turns.
+ */
+export function ballBonus(item: string, target: { types: string[]; level: number }, opts: { caughtBefore: boolean; turns: number; underwater: boolean }): number {
+  switch (item) {
+    case 'ITEM_ULTRA_BALL': return 20;
+    case 'ITEM_GREAT_BALL': case 'ITEM_SAFARI_BALL': return 15;
+    case 'ITEM_NET_BALL': return target.types.includes('TYPE_WATER') || target.types.includes('TYPE_BUG') ? 30 : 10;
+    case 'ITEM_DIVE_BALL': return opts.underwater ? 35 : 10;
+    case 'ITEM_NEST_BALL': return target.level < 40 ? Math.max(10, 40 - target.level) : 10;
+    case 'ITEM_REPEAT_BALL': return opts.caughtBefore ? 30 : 10;
+    case 'ITEM_TIMER_BALL': return Math.min(40, opts.turns + 10);
+    default: return 10; // Poké, Luxury, Premier
+  }
+}
+
+/**
+ * The catch odds: catch rate x bonus / 10 x (3 max HP - 2 HP) / 3 max HP,
+ * then x2 asleep or frozen, x1.5 for poison, burn or paralysis. Over 254
+ * always catches.
+ */
+export function catchOdds(catchRate: number, bonus: number, maxHp: number, hp: number, status: MajorStatus | null): number {
+  let odds = Math.floor((Math.floor((catchRate * bonus) / 10) * (maxHp * 3 - hp * 2)) / (3 * maxHp));
+  if (status?.kind === 'sleep' || status?.kind === 'freeze') odds *= 2;
+  else if (status) odds = Math.floor((odds * 15) / 10);
+  return odds;
+}
+
+/**
+ * The shakes: up to four checks of Random() against 1048560 / the fourth
+ * root of 16711680 / odds; passing all four (BALL_3_SHAKES_SUCCESS) is a
+ * catch. Returns how many passed, 0-4.
+ */
+export function ballShakes(odds: number, r16: () => number): number {
+  if (odds > 254) return 4;
+  const threshold = Math.floor(1048560 / isqrt(isqrt(Math.floor(16711680 / Math.max(1, odds)))));
+  let shakes = 0;
+  while (shakes < 4 && r16() < threshold) shakes++;
+  return shakes;
+}

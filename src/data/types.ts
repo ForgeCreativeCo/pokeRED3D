@@ -252,6 +252,8 @@ export interface ItemData {
   fieldUse: string | null;
   /** key items: can't be tossed */
   important: boolean;
+  /** in battle: BattleUseFunc_PokeBallEtc (balls), BattleUseFunc_Medicine, …, or null */
+  battleUse: string | null;
 }
 
 export interface ItemsFile {
@@ -336,6 +338,8 @@ export interface BattleFile {
   trainerPics: Record<string, { pic: string; y: number }>;
   /** the player's back pictures (RED, LEAF): 64x64 frames stacked top to bottom */
   playerPics: Record<string, { pic: string; frames: number }>;
+  /** each ball by item: a 16x48 PNG data URI, three frames (closed, tilted left, tilted right) */
+  ballPics: Record<string, string>;
   /** BATTLE_TERRAIN_… -> the scene above the text box, 240x112 PNG data URI (colour 0 transparent) */
   terrains: Record<string, string>;
   /** songs for wild battles */

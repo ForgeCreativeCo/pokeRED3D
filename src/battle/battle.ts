@@ -14,20 +14,24 @@
 // catching, trainer AI beyond picking a move at random, and move effects
 // beyond the ones the early game uses (see EFFECTS).
 
-import type { BattleFile, MoveData, PokemonFile, TrainerMon } from '../data/types';
+import type { BattleFile, ItemData, MoveData, PokemonFile, TrainerMon } from '../data/types';
 import { abilityOf, buildMon, calcStats, expForLevel, initialMoves, type MajorStatus, type Mon } from '../pokemon/mon';
 import {
-  baseDamage, battleSpeed, bGoesFirst, critStage, effectiveness, escapes, expGained, finalDamage, gainEvs, hitChance, hits,
+  ballBonus, ballShakes, baseDamage, battleSpeed, catchOdds, bGoesFirst, critStage, effectiveness, escapes, expGained, finalDamage, gainEvs, hitChance, hits,
   isCrit, noStages, prizeMoney, typeMultipliers, type Effectiveness, type Fighter, type StageKey, type Stages,
 } from './rules';
 
 export type Side = 'player' | 'foe';
 export const other = (s: Side): Side => (s === 'player' ? 'foe' : 'player');
 
+export type Outcome = 'won' | 'lost' | 'ran' | 'caught';
+
 export type Action =
   | { type: 'move'; slot: number }
   | { type: 'switch'; party: number }
-  | { type: 'run' };
+  | { type: 'run' }
+  /** a Bag item: a ball at the foe, or medicine for a party slot */
+  | { type: 'item'; item: string; party?: number };
 
 export type BattleEvent =
   /** a Pokémon comes out: wild ones appear, trainers send theirs, the player says "Go!" */
@@ -68,7 +72,13 @@ export type BattleEvent =
   | { type: 'run'; ok: boolean; reason?: 'trainer' }
   /** the player must send out another Pokémon (switchIn) */
   | { type: 'need-switch' }
-  | { type: 'end'; outcome: 'won' | 'lost' | 'ran'; money?: number }
+  /** "RED used POKé BALL!" */
+  | { type: 'item'; item: string }
+  /** a ball thrown: blocked by a trainer, or how many times it shook (4 is a catch) */
+  | { type: 'ball'; item: string; blocked?: boolean; shakes: number }
+  /** medicine restored a party Pokémon's HP */
+  | { type: 'restore'; party: number; amount: number; hp: number }
+  | { type: 'end'; outcome: Outcome; money?: number }
   /**
    * The first battle's tutorial (BATTLE_TYPE_FIRST_BATTLE): Oak's comment the
    * first time the foe takes damage, and the first time the player lowers one
@@ -142,6 +152,12 @@ export interface BattleSetup {
    * no critical hits until that first damage (Cmd_accuracycheck, Cmd_critcalc).
    */
   firstBattle?: boolean;
+  /** the items, for what they do in battle */
+  items?: Record<string, ItemData>;
+  /** whether the player has caught a species before (the Repeat Ball) */
+  caughtBefore?: (species: string) => boolean;
+  /** the battle is underwater (the Dive Ball) */
+  underwater?: boolean;
 }
 
 export class Battle {
@@ -152,13 +168,16 @@ export class Battle {
   readonly active: Record<Side, Battler>;
   /** 'action': waiting for the player's choice; 'switch': for a Pokémon to send out; 'over' */
   phase: 'action' | 'switch' | 'over' = 'action';
-  outcome: 'won' | 'lost' | 'ran' | null = null;
+  outcome: Outcome | null = null;
   /** moves waiting for the player to decide what to forget (learnMove) */
   readonly pendingMoves: { party: number; move: string }[] = [];
   private readonly playerId: number;
   private readonly rng: () => number;
   private runTries = 0;
   readonly firstBattle: boolean;
+  /** turns so far (gBattleResults.battleTurnCounter, for the Timer Ball) */
+  turns = 0;
+  private setup: BattleSetup;
   /** the tutorial's flags: the foe has taken damage; a foe's stat has fallen */
   private tutorial = { damaged: false, lowered: false };
   /** player party slots that have faced the foe that's out */
@@ -169,6 +188,7 @@ export class Battle {
     this.data = setup.battle;
     this.rng = setup.rng;
     this.firstBattle = !!setup.firstBattle;
+    this.setup = setup;
     this.playerId = setup.playerId;
     if ('wild' in setup.foe) {
       this.trainer = null;
@@ -203,6 +223,8 @@ export class Battle {
       if (this.tryRun(ev)) return ev;
     }
     if (action.type === 'switch') this.switchTo('player', action.party, ev);
+    // Items too, before any move; a caught Pokémon ends the battle.
+    if (action.type === 'item') { this.useItem(action.item, action.party, ev); if (this.outcome === 'caught') return ev; }
 
     const foeSlot = this.chooseMove('foe');
     const playerSlot = action.type === 'move' ? this.checkSlot(action.slot) : null;
@@ -218,7 +240,38 @@ export class Battle {
     }
     if (this.phase === 'action' && this.mon('player').hp > 0 && this.mon('foe').hp > 0) this.endTurn(order, ev);
     for (const side of ['player', 'foe'] as Side[]) this.active[side].flinched = false;
+    this.turns++;
     return ev;
+  }
+
+  /**
+   * A Bag item. A ball (BattleUseFunc_PokeBallEtc) goes at the foe: a trainer
+   * blocks it; otherwise Cmd_handleballthrow decides the shakes, and four is
+   * a catch. Medicine restores a party Pokémon's HP by the item's amount
+   * (255: all of it). The item is used up either way; taking it from the Bag
+   * is the screen's job.
+   */
+  private useItem(item: string, party: number | undefined, ev: BattleEvent[]) {
+    const data = this.setup.items?.[item];
+    ev.push({ type: 'item', item });
+    if (data?.battleUse === 'BattleUseFunc_PokeBallEtc') {
+      if (this.trainer) { ev.push({ type: 'ball', item, blocked: true, shakes: 0 }); return; }
+      const foe = this.mon('foe'), sp = this.pokemon.species[foe.species];
+      const bonus = ballBonus(item, { types: sp.types, level: foe.level }, {
+        caughtBefore: !!this.setup.caughtBefore?.(foe.species), turns: this.turns, underwater: !!this.setup.underwater,
+      });
+      const odds = catchOdds(sp.catchRate, bonus, foe.stats.hp, foe.hp, foe.status ?? null);
+      const shakes = item === 'ITEM_MASTER_BALL' ? 4 : ballShakes(odds, this.r16);
+      ev.push({ type: 'ball', item, shakes });
+      if (shakes === 4) this.finish('caught', ev);
+      return;
+    }
+    const mon = this.parties.player[party ?? this.active.player.party];
+    if (data && data.param > 0 && mon && mon.hp > 0) {
+      const amount = Math.min(mon.stats.hp - mon.hp, data.param === 255 ? mon.stats.hp : data.param);
+      mon.hp += amount;
+      ev.push({ type: 'restore', party: party ?? this.active.player.party, amount, hp: mon.hp });
+    }
   }
 
   /** After the player's Pokémon fainted: send out another. */
@@ -543,7 +596,7 @@ export class Battle {
 
   private foeWaiting = false;
 
-  private finish(outcome: 'won' | 'lost' | 'ran', ev: BattleEvent[], money?: number) {
+  private finish(outcome: Outcome, ev: BattleEvent[], money?: number) {
     this.phase = 'over';
     this.outcome = outcome;
     ev.push(money === undefined ? { type: 'end', outcome } : { type: 'end', outcome, money });

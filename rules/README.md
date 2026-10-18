@@ -31,7 +31,7 @@ Outputs:
 - `build/data/scripts.json`, `build/data/music.json`: the scripts and text, and the songs with their samples (see below)
 - `build/data/pokemon.json`: every species and move, the natures and ability names, and pictures of the Pokémon the scripts mention (see below)
 - `build/data/items.json`: every item (name, price, pocket, description) and the money a new game starts with
-- `build/data/battle.json`: the type chart, the baked maps' wild Pokémon, every trainer the scripts can battle, trainer and player pictures, and the battle backgrounds (see below)
+- `build/data/battle.json`: the type chart, the baked maps' wild Pokémon, every trainer the scripts can battle, trainer, player and ball pictures, and the battle backgrounds (see below)
 
 The game (`src/`, `npm run dev`) loads these. Walk with WASD, hop ledges,
 tune the camera from the panel, and compare against the original GBA view.
@@ -133,11 +133,11 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 // pokemon.json: { "species": { SPECIES_…: { name, base, types, abilities, growth, genderRatio, learnset, … } },
 //                 "moves": { MOVE_…: { name, type, power, accuracy, pp, … } }, "natures", "abilities",
 //                 "pics": { SPECIES_…: { front, back, icon } } }   // PNG data URIs
-// items.json:   { "items": { ITEM_…: { name, price, pocket, description, param, fieldUse, important } }, "startMoney" }
+// items.json:   { "items": { ITEM_…: { name, price, pocket, description, param, fieldUse, battleUse, important } }, "startMoney" }
 // battle.json:  { "types": { "chart": [[attacker, defender, x10]], "foresight", "names" },
 //                 "wild": { "slotRates", "rodGroups", "maps": { MAP_…: { land, water, rockSmash, fishing } } },
 //                 "trainers": { TRAINER_…: { name, class, className, double, party, money, pic, music, … } },
-//                 "trainerPics", "playerPics", "terrains": { BATTLE_TERRAIN_…: PNG data URI }, "music" }
+//                 "trainerPics", "playerPics", "ballPics", "terrains": { BATTLE_TERRAIN_…: PNG data URI }, "music" }
 ```
 
 `src/data/types.ts` types every one of these files.

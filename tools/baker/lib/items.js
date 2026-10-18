@@ -30,6 +30,8 @@ export function bakeItems() {
       fieldUse: it.fieldUseFunc ?? null,
       /** key items can't be tossed or sold */
       important: !!it.importance,
+      /** in battle: BattleUseFunc_PokeBallEtc (balls), BattleUseFunc_Medicine, …, or null where it can't be used */
+      battleUse: it.battleUsage && it.battleUseFunc !== 'NULL' ? it.battleUseFunc : null,
     };
   }
   return out;

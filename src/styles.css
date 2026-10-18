@@ -444,4 +444,8 @@ body.battling #yesno { z-index: 6; }
 .bparty .hpbar { grid-area: bar; }
 .bparty .hpnum { grid-area: hp; font-variant-numeric: tabular-nums; }
 .bparty li[data-new] { color: #3878e0; }
+.bparty .bdesc { margin: calc(4 * var(--p)) 0 0; padding-top: calc(3 * var(--p)); border-top: calc(1 * var(--p)) dashed #c8d8e0; font-size: calc(9 * var(--p)); line-height: calc(11 * var(--p)); color: #606060; }
+/* A thrown ball: 16x16, one of its strip's three frames (closed, tilted left, tilted right), where the foe stands. */
+.bball { position: absolute; left: calc(168 * var(--p)); top: calc(46 * var(--p)); width: calc(16 * var(--p)); height: calc(16 * var(--p)); background-size: 100% 300%; background-repeat: no-repeat; }
+.bball[data-frame='0'] { background-position: 0 0; } .bball[data-frame='1'] { background-position: 0 50%; } .bball[data-frame='2'] { background-position: 0 100%; }
 .bparty.forget li { grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "cur name lv hp"; }

@@ -34,6 +34,10 @@ FireRed's opening, from a new save:
    lose (no whiteout here: Oak pays), Blue says his piece and leaves.
 6. Wild Pokémon in Route 1's tall grass: Pidgey and Rattata, at FireRed's
    rates. Lose and you wake up at home, a little poorer, with Mom fussing.
+7. Catch them: open the BAG in battle and throw a POKé BALL (or use a Potion).
+   A catch joins your party, or goes to the PC when the party is full, and
+   the Pokédex marks it caught. (Nothing in the bake sells balls yet: the test
+   hook's `giveItem` hands them out.)
 
 Along the way:
 
@@ -63,7 +67,7 @@ Along the way:
   and CONTINUE puts you back where you saved, with your party, Bag, money,
   Pokédex, time and every story flag.
 
-Not yet: catching, using items, nicknames.
+Not yet: using items outside battle, nicknames, buying things.
 
 ## Getting started
 
@@ -205,7 +209,9 @@ step reloads the page with its storage, as closing and reopening the game
 would; `["advance"]` stops at battle menus as it does at a YES / NO, and
 `["fight"]` uses the first move every turn until the battle is over, and
 `["wander"]` walks down and up until a wild Pokémon appears. `wild.json`
-walks Route 1's grass into a Pidgey and beats it, then into a Rattata and runs.
+walks Route 1's grass into a Pidgey and beats it, then into a Rattata and runs;
+`catch.json` tries a Potion that won't have any effect, then throws POKé BALLs
+with `["catch"]` until a Pidgey is caught.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -233,7 +239,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
-| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · ✓ Blue in the lab (`trainerbattle_earlyrival`, Oak's tutorial) · ✓ wild encounters in tall grass, and whiting out · e. catching |
+| ✓ | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · ✓ Blue in the lab (`trainerbattle_earlyrival`, Oak's tutorial) · ✓ wild encounters in tall grass, and whiting out · ✓ catching, and the Bag in battle |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track
@@ -259,8 +265,10 @@ This runs alongside the steps above:
   just say their challenge.
 - There's no naming screen yet: saying YES to a nickname keeps the species
   name.
-- Items can't be used yet (Oak tells you it isn't the time), and there's no
-  GIVE until Pokémon can hold items.
+- Outside battle, items can't be used yet (Oak tells you it isn't the time),
+  and there's no GIVE until Pokémon can hold items. In battle, balls and HP
+  medicine work; status medicine (Antidote and the rest) doesn't yet. The PC
+  keeps what's caught with a full party, but there's no PC to visit yet.
 - A save lives in the browser that made it (each Artifact link is its own
   site), so it doesn't follow you to another browser or device.
 - NPCs whose sprite is chosen at runtime (`OBJ_EVENT_GFX_VAR_*`) show as a
