@@ -39,6 +39,8 @@ export interface ScriptHost {
   battle(foe: { trainer: string }, opts: { loseText?: string; winText?: string; firstBattle?: boolean; healAfter?: boolean }): Promise<'won' | 'lost' | 'ran'>;
   /** HealPlayerParty */
   healParty(): void;
+  /** losing a battle that isn't Blue's in the lab: money lost, healed, home */
+  whiteOut(): Promise<void>;
   /** the trainers, for their encounter music */
   battleData?: { trainers: Record<string, { music: { encounter: string } }> };
 }
@@ -75,6 +77,11 @@ export class ScriptVM {
   constructor(private data: ScriptsFile, private host: ScriptHost) {}
 
   /** Follow constants to what they stand for (up to 4 deep). */
+  /** Whether a script is in the bake. */
+  has(label: string) {
+    return !!this.data.scripts[label];
+  }
+
   resolve(a: string | undefined): string | undefined {
     let v = a;
     for (let i = 0; i < 4 && v !== undefined && this.data.consts[v] != null; i++) v = this.data.consts[v];
@@ -258,7 +265,7 @@ export class ScriptVM {
             const outcome = await this.host.battle({ trainer: args[0] }, { loseText: args[2] });
             story.flags.add(args[0]);
             music.play(this.currentMap?.data.music);
-            if (outcome === 'lost') { this.host.healParty(); pc = body.length; stack.length = 0; break; }
+            if (outcome === 'lost') { pc = body.length; stack.length = 0; void this.host.whiteOut(); break; }
             if (args[3] && args[3] !== 'FALSE' && jump(args[3])) break;
             pc = body.length; stack.length = 0;
             break;

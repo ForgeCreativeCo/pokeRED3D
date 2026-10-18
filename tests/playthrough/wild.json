@@ -1,0 +1,14 @@
+[
+  ["give","SPECIES_SQUIRTLE",5],
+  ["go","Route1",10,6],
+  ["wander"],
+  ["advance"],
+  ["fight"],
+  ["advance"],
+  ["wander"],
+  ["advance"],
+  ["press","down"],
+  ["press","right"],
+  ["press","a"],
+  ["advance"]
+]

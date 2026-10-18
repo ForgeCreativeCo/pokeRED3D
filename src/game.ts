@@ -21,13 +21,16 @@ import { Emote } from './ui/emote';
 import { Panel, pretty } from './ui/panel';
 import { MonPic } from './ui/monPic';
 import { PartyMenu } from './ui/party';
-import { battleRandom, monRandom } from './core/random';
+import { battleRandom, encounterRandom, monRandom } from './core/random';
 import type { ItemData, PokemonFile } from './data/types';
 import { StartMenu } from './ui/startMenu';
 import { BagMenu, OptionsMenu, Pokedex, TitleScreen, TrainerCard } from './ui/screens';
 import { applySave, makeSave, readSave, writeSave, type SaveFile } from './save/save';
 import { BattleScreen, type BattleOutcome } from './ui/battleScreen';
 import { battleTerrain } from './battle/terrain';
+import { WildEncounters, createWildMon } from './battle/wild';
+import { whiteOutLoss } from './battle/rules';
+import { abilityOf } from './pokemon/mon';
 import type { Mon } from './pokemon/mon';
 
 /** In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows. */
@@ -56,6 +59,7 @@ export class Game implements ScriptHost {
   readonly startMenu: StartMenu;
   readonly battleScreen: BattleScreen;
   readonly battleData: GameData['battle'];
+  readonly wild: WildEncounters;
   /** shown at start-up when there's a save: CONTINUE or NEW GAME */
   readonly title: TitleScreen | null;
   /** a save from another game is in storage: the first save asks before overwriting it */
@@ -120,6 +124,7 @@ export class Game implements ScriptHost {
     this.title?.show();
     this.textbox = new TextBox(this.clock, this.input, this.story, doc);
     this.battleData = data.battle;
+    this.wild = new WildEncounters(data.battle);
     this.battleScreen = new BattleScreen(this.clock, this.input, this.story, doc, data.pokemon, data.battle, this.music, data.scripts.text);
     this.emote = new Emote(this.clock, doc);
     this.vm = new ScriptVM(data.scripts, this);
@@ -169,6 +174,44 @@ export class Game implements ScriptHost {
     const terrain = battleTerrain(this.world.behaviorAt(this.player.x, this.player.y) ?? 'MB_NORMAL', c?.m.data.mapType ?? 'MAP_TYPE_ROUTE', c?.m.data.battleScene);
     const text = (label?: string) => (label ? this.texts[label] : undefined);
     return this.battleScreen.run({ foe, terrain, rng: battleRandom, loseText: text(opts.loseText), winText: text(opts.winText), firstBattle: opts.firstBattle, healAfter: opts.healAfter });
+  }
+
+  /**
+   * After a step: maybe a wild Pokémon (TryStandardWildEncounter), and its
+   * battle. Losing whites out. Only with a Pokémon that can battle.
+   */
+  private tryWildEncounter() {
+    const { player, world, story } = this;
+    const c = world.locate(player.x, player.y);
+    const lead = story.party.find((m) => m.hp > 0);
+    if (!c || !lead) return;
+    const r16 = () => Math.floor(encounterRandom() * 0x10000);
+    const first = story.party[0];
+    const met = this.wild.step({ encounter: world.encounterAt(player.x, player.y), behavior: world.behaviorAt(player.x, player.y) ?? '' }, c.m.data.id,
+      abilityOf(this.pokemon.species[first.species], first.personality), r16);
+    if (!met) return;
+    const mon = createWildMon(this.pokemon, met.species, met.level, r16, { id: story.trainerId, name: story.names.PLAYER });
+    this.input.clearHeld();
+    void this.battle({ wild: mon }).then((outcome) => { if (outcome === 'lost') return this.whiteOut(); });
+  }
+
+  /**
+   * DoWhiteOut: lose money (ComputeWhiteOutMoneyLoss), heal, and wake up at the
+   * last heal point. Only Pallet Town's so far: Red's house, in front of Mom
+   * (SetWhiteoutRespawnWarpAndHealerNpc puts you at 8,5), who says her piece.
+   */
+  async whiteOut() {
+    const { story } = this;
+    const badges = [...story.flags].filter((f) => /^FLAG_BADGE0\d_GET$/.test(f)).length;
+    story.money -= whiteOutLoss(Math.max(...story.party.map((m) => m.level)), badges, story.money);
+    this.healParty();
+    this.wild.reset();
+    const home = this.world.mapByName('PalletTown_PlayersHouse_1F');
+    if (!home) return;
+    await this.warpTo(home, 8, 5);
+    this.player.facing = 'up';
+    if (this.texts.gText_PlayerScurriedBackHome) { await this.textbox.say(this.texts.gText_PlayerScurriedBackHome); this.textbox.close(); }
+    if (this.vm.has('EventScript_AfterWhiteOutMomHeal')) this.vm.run('EventScript_AfterWhiteOutMomHeal', null);
   }
 
   /** HealPlayerParty: full HP and PP, no status. */
@@ -418,7 +461,7 @@ export class Game implements ScriptHost {
           // Stepping onto stairs takes them; stepping onto a trigger starts its scene.
           const w = world.warpAt(a.x, a.y);
           if (w && isStairs(w.behavior)) this.warp(w);
-          else { const t = vm.triggerAt(a.x, a.y); if (t) vm.run(t.script, null); }
+          else { const t = vm.triggerAt(a.x, a.y); if (t) vm.run(t.script, null); else this.tryWildEncounter(); }
         }
       }
     }

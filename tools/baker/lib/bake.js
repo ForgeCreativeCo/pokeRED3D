@@ -312,6 +312,8 @@ export function bakeMap(name, rules, lookup) {
         height: cells.map((c) => +c.h.toFixed(3)),
         elevation: cells.map((c) => c.elevation),
         behavior: cells.map((c) => c.e.behavior),
+        // The metatile's encounter type: 0 none, 1 land (tall grass, caves), 2 water.
+        encounter: cells.map((c) => c.e.encounterType ?? 0),
         class: cells.map((c) => c.e.class),
       },
       connections: map.connections ?? [],

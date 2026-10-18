@@ -111,6 +111,8 @@ export interface MapFile {
     height: number[];
     elevation: number[];
     behavior: string[];
+    /** the metatile's encounter type: 0 none, 1 land (tall grass, caves), 2 water */
+    encounter: number[];
     class: string[];
   };
   connections: Connection[];

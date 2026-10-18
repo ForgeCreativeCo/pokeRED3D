@@ -32,6 +32,8 @@ FireRed's opening, from a new save:
    you on the way out.
 5. Your first battle, with Oak talking you through it as in FireRed. Win or
    lose (no whiteout here: Oak pays), Blue says his piece and leaves.
+6. Wild Pokémon in Route 1's tall grass: Pidgey and Rattata, at FireRed's
+   rates. Lose and you wake up at home, a little poorer, with Mom fussing.
 
 Along the way:
 
@@ -61,7 +63,7 @@ Along the way:
   and CONTINUE puts you back where you saved, with your party, Bag, money,
   Pokédex, time and every story flag.
 
-Not yet: wild Pokémon, using items, nicknames.
+Not yet: catching, using items, nicknames.
 
 ## Getting started
 
@@ -201,7 +203,9 @@ reloads the page and continues; `battle.json` beats Blue's Squirtle with
 Tackle, then meets a wild Pidgey in Route 1's grass and runs. A `["reload"]`
 step reloads the page with its storage, as closing and reopening the game
 would; `["advance"]` stops at battle menus as it does at a YES / NO, and
-`["fight"]` uses the first move every turn until the battle is over.
+`["fight"]` uses the first move every turn until the battle is over, and
+`["wander"]` walks down and up until a wild Pokémon appears. `wild.json`
+walks Route 1's grass into a Pidgey and beats it, then into a Rattata and runs.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -229,7 +233,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
-| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · ✓ Blue in the lab (`trainerbattle_earlyrival`, Oak's tutorial) · c. wild encounters in tall grass · e. catching |
+| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · ✓ Blue in the lab (`trainerbattle_earlyrival`, Oak's tutorial) · ✓ wild encounters in tall grass, and whiting out · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track
@@ -248,9 +252,11 @@ This runs alongside the steps above:
 
 ### Known gaps
 
-- Tall grass has no encounters yet, and losing outside Blue's lab battle
-  doesn't take you home (no whiteout warp yet). Double battles (Route 21
-  North's Lil & Ian) still just say their challenge.
+- Whiting out always takes you to Red's house: Pallet Town is the only heal
+  point in the bake. FireRed shows "scurried back home" on a black screen;
+  here the room is already showing. Repel and the other encounter-rate
+  items aren't in yet. Double battles (Route 21 North's Lil & Ian) still
+  just say their challenge.
 - There's no naming screen yet: saying YES to a nickname keeps the species
   name.
 - Items can't be used yet (Oak tells you it isn't the time), and there's no

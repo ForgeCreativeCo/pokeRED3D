@@ -157,6 +157,8 @@ export function classifyTilesets(tilesetSymbols, rules) {
         id,
         hex: `0x${id.toString(16)}`,
         behavior: behaviorName,
+        /** TILE_ENCOUNTER_NONE / LAND / WATER: where wild Pokemon can appear */
+        encounterType: mt.encounterType,
         layerType: mt.layerType,
         stats: {
           placements: s.placements,

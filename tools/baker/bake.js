@@ -102,6 +102,8 @@ const roots = world.flatMap((w) => [
   ...w.data.objects.map((o) => o.script), ...w.data.signs.map((s) => s.script),
   ...w.data.triggers.map((t) => t.script), w.data.mapScripts,
 ]);
+// Mom's lines after a whiteout, when Red's house is in the bake.
+if (baked.has('PalletTown_PlayersHouse_1F')) roots.push('EventScript_AfterWhiteOutMomHeal');
 const scripts = { ...bakeScripts(roots), startFlags: [...newGame().hiddenFlags] };
 console.log(`Scripts: ${Object.keys(scripts.scripts).length} scripts, ${Object.keys(scripts.text).length} texts`);
 
@@ -154,6 +156,8 @@ Object.assign(scripts.text, uiText([
   'gText_PlayerSavedTheGame', 'gText_OakForbidsUseOfItemHere', 'gText_ThrowAwayStrVar2OfThisItemQM',
   // the battle screen's party list and move forgetting
   'gText_ChoosePokemon', 'gText_PkmnHasNoEnergy', 'gText_PkmnAlreadyInBattle', 'gText_WhichMoveToForget',
+  // waking up at home after a whiteout
+  'gText_PlayerScurriedBackHome',
 ]));
 console.log(`Items: ${Object.keys(items.items).length}; a new game starts with ${items.startMoney} money`);
 console.log(`Pokémon: ${Object.keys(pokemon.species).length} species, ${Object.keys(pokemon.moves).length} moves; pictures of ${Object.keys(pokemon.pics).join(', ') || 'none'}`);

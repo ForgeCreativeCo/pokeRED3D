@@ -44,6 +44,7 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
     monPic: { show: (s) => { pics.push(s); }, hide: () => { pics.push('hidden'); } },
     battle: async (foe, opts) => { battles.push({ foe, opts }); return battleOutcome; },
     healParty: () => { healed.push(1); },
+    whiteOut: async () => { healed.push(2); },
   };
   const data: ScriptsFile = { scripts, text: {}, consts: {}, textColors: {}, startFlags: [], ...more };
   return { vm: new ScriptVM(data, host), host, said, played, pics, map, player, npcs, battles, healed };

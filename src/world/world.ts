@@ -56,6 +56,12 @@ export class World {
     return c ? c.m.data.grid.height[c.i] : 0;
   }
 
+  /** The cell's encounter type: 0 none, 1 land, 2 water. */
+  encounterAt(gx: number, gy: number): number {
+    const c = this.locate(gx, gy);
+    return c ? c.m.data.grid.encounter?.[c.i] ?? 0 : 0;
+  }
+
   behaviorAt(gx: number, gy: number): string | null {
     const c = this.locate(gx, gy);
     return c ? c.m.data.grid.behavior[c.i] : null;

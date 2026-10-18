@@ -98,6 +98,19 @@ export async function play(steps, { url, seed = 1 }) {
           }
         }
         entry.said = said;
+      } else if (method === 'wander') {
+        // ['wander', max]: walk down and up, a step at a time, until a battle
+        // starts (a wild Pokémon in tall grass) or after max steps.
+        const [max = 80] = args;
+        for (let i = 0; i < max; i++) {
+          // A new direction first turns on the spot, so tap until the step is taken.
+          const before = (await state()).where.split(' facing')[0];
+          for (let tries = 0; tries < 3; tries++) {
+            await call('walk', i % 2 ? 'up' : 'down', 0.05);
+            if ((await state()).where.split(' facing')[0] !== before || (await call('battleState')) !== 'closed') break;
+          }
+          if ((await call('battleState')) !== 'closed') break;
+        }
       } else if (method === 'fight') {
         // ['fight', max]: in a battle, choose FIGHT and the first move every
         // turn, send out the next Pokémon when one faints, and read every

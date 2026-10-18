@@ -5,7 +5,8 @@ import type { MapFile } from '../../src/data/types';
 
 /**
  * A map from rows of characters: '.' walkable ground, '#' blocked,
- * 'v' a ledge you hop southward, '^' raised (height 1) and walkable.
+ * 'v' a ledge you hop southward, '^' raised (height 1) and walkable,
+ * 'g' tall grass (a land encounter tile).
  */
 export function makeMap(name: string, rows: string[], opts: { area?: number; ox?: number; oy?: number; data?: Partial<MapFile> } = {}): LoadedMap {
   const width = rows[0].length, height = rows.length;
@@ -18,7 +19,8 @@ export function makeMap(name: string, rows: string[], opts: { area?: number; ox?
       walkable: cells.map((c) => (c === '#' ? 0 : 1)),
       height: cells.map((c) => (c === '^' ? 1 : 0)),
       elevation: cells.map(() => 3),
-      behavior: cells.map((c) => (c === 'v' ? 'MB_JUMP_SOUTH' : 'MB_NORMAL')),
+      behavior: cells.map((c) => (c === 'v' ? 'MB_JUMP_SOUTH' : c === 'g' ? 'MB_TALL_GRASS' : 'MB_NORMAL')),
+      encounter: cells.map((c) => (c === 'g' ? 1 : 0)),
       class: cells.map((c) => (c === '#' ? 'wall' : 'ground')),
     },
     connections: [], warps: [], objects: [], signs: [], triggers: [], mapScripts: `${name}_MapScripts`,

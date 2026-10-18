@@ -29,7 +29,8 @@ first for the overall shape.
 - **Trainer battles are real.** `trainerbattle_earlyrival` (Blue in the lab)
   and `trainerbattle_single` start a battle (see "Trainer battles in
   scripts" below). `trainerbattle_double` and the rematch variants still
-  show the challenge and stop. Tall grass has no encounters.
+  show the challenge and stop. Tall grass has wild Pokémon (see "Wild
+  encounters" below).
 
 ## Where battles plug in
 
@@ -187,8 +188,8 @@ on it like a script.
 
 Not yet: the BAG (it says items can't be used now), the stat window on a
 level-up, the low-HP warning sound, move animations, a whiteout taking you
-home, and wild encounters (step 5). The test hook's `battle()` starts any
-battle where the player stands.
+home on a black screen. The test hook's `battle()` starts any battle where
+the player stands.
 
 ## Trainer battles in scripts
 
@@ -219,6 +220,30 @@ battle where the player stands.
 Trainers beaten are kept as story flags named by their id
 (`TRAINER_RIVAL_OAKS_LAB_CHARMANDER`), so a save remembers them.
 
+## Wild encounters
+
+`src/battle/wild.ts` ports `src/wild_encounter.c`; `Game.frame` asks it after
+every step the player finishes, once stairs and step-on scripts have had
+their turn, as `ProcessPlayerFieldInput` does.
+
+- **Where:** the baker now keeps each cell's metatile encounter type
+  (`grid.encounter`: 1 land, 2 water); land cells use the map's FireRed
+  `land` table. Water needs Surf, so only land encounters happen yet.
+- **Whether:** `HandleWildEncounterCooldown` (a few steps that always pass,
+  by the rate, with a 5% chance a step to skip ahead), the 60% roll on
+  stepping from a different kind of tile, then the rate x 16 out of 1600,
+  raised by a buff that grows with every miss. A lead with Stench halves the
+  chance; Illuminate doubles it.
+- **What:** the slot by `slotRates`, a level in its range, and the Pokémon
+  made as `CreateMonWithNature` makes it (nature first, the player as its
+  original trainer).
+- **Randomness:** its own stream, `encounterRandom`, so walking in grass
+  can't shift battle rolls or new Pokémon.
+- **Whiting out** (`Game.whiteOut`, `DoWhiteOut`): money lost by
+  `whiteOutLoss`, the party healed, and back to Red's house at (8, 5) facing
+  Mom, with "scurried back home" and `EventScript_AfterWhiteOutMomHeal`. Losing
+  a `trainerbattle_single` whites out too.
+
 ## Suggested order
 
 1. ~~**Bake** the type chart, Route 1's FireRed encounters, Blue's lab parties,
@@ -230,6 +255,7 @@ Trainers beaten are kept as story flags named by their id
    screen" below.
 4. ~~**Blue in the lab** via `trainerbattle_earlyrival`.~~ Done: see "Trainer
    battles in scripts" below.
-5. **Wild encounters** in Route 1's tall grass, with RUN.
+5. ~~**Wild encounters** in Route 1's tall grass, with RUN.~~ Done: see "Wild
+   encounters" below.
 6. **Catching** with POKé BALLs from the Bag, filling the Pokédex
    (`Story.register`).

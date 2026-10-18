@@ -101,7 +101,7 @@ player in the walk-behind row just like on the GBA.
   "camera": { "preset": "default", "pitch": 55, "fov": 24, "view": 11 },
   "grid": {            // row-major, width * height
     "walkable": [0, 1, ...], "height": [...], "elevation": [...],
-    "behavior": ["MB_NORMAL", ...], "class": ["ground", ...]
+    "behavior": ["MB_NORMAL", ...], "encounter": [0, 1, ...], "class": ["ground", ...]  // encounter: 1 land, 2 water
   },
   "connections": [...], "warps": [...], "objects": [...], "signs": [...],  // from the decomp map.json
   "structures": { "buildings": [...], "objects": [...] },                   // what the stand-up rule found
