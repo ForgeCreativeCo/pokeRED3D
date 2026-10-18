@@ -253,6 +253,22 @@ export function bakeTrainers(ids) {
   return { trainers: out, pics };
 }
 
+// ---- text ----
+
+/**
+ * Every string in src/battle_message.c, by its C name (sText_PkmnUsedMove,
+ * gText_WhatWillPkmnDo, …), with FireRed's escapes and placeholders kept
+ * ({B_ATK_NAME_WITH_PREFIX}, \n, \p, {PAUSE 60}) for the battle screen to
+ * fill in. Also the stat names in gStatNamesTable's order.
+ */
+export function bakeBattleText() {
+  const src = read('src/battle_message.c');
+  const text = {};
+  for (const [, name, body] of src.matchAll(/^(?:static )?const u8 (\w+)\[\]\s*=\s*_\("((?:[^"\\]|\\.)*)"\);/gm)) text[name] = body;
+  const statNames = [...braceBlock(src, src.indexOf('gStatNamesTable[]')).matchAll(/(\w+)/g)].map(([, sym]) => text[sym]);
+  return { text, statNames };
+}
+
 // ---- backgrounds ----
 
 /**

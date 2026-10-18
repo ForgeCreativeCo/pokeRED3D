@@ -154,6 +154,13 @@ body.compare .pane-label { display: block; }
   font: 700 22px var(--font-display); cursor: pointer; touch-action: none;
 }
 #aBtn.held { filter: brightness(.85); }
+#bBtn {
+  position: fixed; z-index: 2; width: 48px; height: 48px; border-radius: 50%;
+  right: calc(16px + 164px + 18px + 64px + 10px + env(safe-area-inset-right, 0px)); bottom: calc(16px + 40px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid var(--panel-edge); background: var(--pad); color: var(--ink);
+  font: 700 18px var(--font-display); cursor: pointer; touch-action: none;
+}
+#bBtn.held { background: var(--accent); color: var(--accent-ink); }
 /* Unless the window is wide, the text box sits above the d-pad and A button. */
 @media (max-width: 1180px) {
   #textbox { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }
@@ -351,3 +358,90 @@ body.compare .pane-label { display: block; }
 @media (max-width: 640px) {
   .bagScreen { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "list" "desc"; }
 }
+
+/* ---- Battles: FireRed's battle screen, placed in the GBA's 240x160 pixels.
+   --p is one GBA pixel; the stage is a size container, so 100cqw is its width.
+   Its colours are the game's own in both themes. ---- */
+#battle {
+  position: fixed; inset: 0; z-index: 4; display: grid; place-items: start center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  background: #101418;
+}
+body.battling #dpad, body.battling #aBtn, body.battling #bBtn, body.battling #startBtn { z-index: 5; }
+body.battling #yesno { z-index: 6; }
+.bstage {
+  position: relative; container-type: inline-size; overflow: hidden;
+  width: min(100%, 960px, calc((100dvh - 230px) * 1.5)); min-width: min(100%, 300px); aspect-ratio: 3 / 2;
+  background: #f8f8f8; border-radius: 6px; box-shadow: 0 8px 30px #0008;
+}
+@media (min-width: 1181px) { .bstage { width: min(100%, 960px, calc((100dvh - 40px) * 1.5)); } }
+.bstage > * { --p: calc(100cqw / 240); }
+.bstage, .bstage * { image-rendering: pixelated; }
+.bstage > * { font: 500 calc(11 * var(--p)) / calc(16 * var(--p)) var(--font-display); }
+.bterrain { position: absolute; left: 0; top: 0; width: calc(240 * var(--p)); height: calc(112 * var(--p)); }
+/* Pokémon pictures: 64x64, centred at sBattlerCoords (foe 176,40; yours 72,80), moved down by --y. */
+.bmon, .btrainer { position: absolute; width: calc(64 * var(--p)); height: calc(64 * var(--p)); transition: transform .35s ease-out, opacity .35s; }
+.bmon img, .btrainer img { width: 100%; height: 100%; display: block; }
+.bmon.foe, .btrainer.foe { left: calc(144 * var(--p)); top: calc((8 + var(--y, 0)) * var(--p)); }
+.bmon.player { left: calc(40 * var(--p)); top: calc((48 + var(--y, 0)) * var(--p)); }
+.btrainer.player { left: calc(40 * var(--p)); top: calc(53 * var(--p)); background-size: 100% calc(var(--frames, 1) * 100%); background-repeat: no-repeat; }
+.bmon.out { opacity: 0; transform: scale(.2); }
+.bmon.fainted { opacity: 0; transform: translateY(calc(40 * var(--p))); }
+.bmon.hit { animation: bhit .1s steps(1) 3; }
+@keyframes bhit { 50% { opacity: 0; } }
+.btrainer.foe.gone { transform: translateX(calc(110 * var(--p))); opacity: 0; }
+.btrainer.player.gone { transform: translateX(calc(-110 * var(--p))); opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .bmon, .btrainer { transition: none; } .bmon.hit { animation: none; } }
+/* HP boxes: the foe's top left, yours bottom right with HP numbers and EXP. */
+.hpbox {
+  position: absolute; box-sizing: border-box; padding: calc(3 * var(--p)) calc(6 * var(--p)) calc(3 * var(--p)) calc(8 * var(--p));
+  background: #f8f8d8; color: #404040; border: calc(2 * var(--p)) solid #506858;
+  font-size: calc(9 * var(--p)); line-height: calc(10 * var(--p));
+}
+.hpbox.foe { left: calc(12 * var(--p)); top: calc(14 * var(--p)); width: calc(102 * var(--p)); border-radius: calc(3 * var(--p)) calc(10 * var(--p)) calc(3 * var(--p)) calc(3 * var(--p)); }
+.hpbox.player { left: calc(124 * var(--p)); top: calc(68 * var(--p)); width: calc(110 * var(--p)); border-radius: calc(10 * var(--p)) calc(3 * var(--p)) calc(3 * var(--p)) calc(3 * var(--p)); }
+.hpbox .row1 { display: flex; gap: calc(3 * var(--p)); align-items: baseline; }
+.hpbox .name { font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; }
+.hpbox .male { color: #3878e0; } .hpbox .female { color: #e05038; }
+.hpbox .row2 { display: flex; gap: calc(3 * var(--p)); align-items: center; }
+.hpbox .hpbar, .bparty .hpbar { flex: 1; display: flex; align-items: center; gap: calc(2 * var(--p)); font-size: calc(7 * var(--p)); }
+.hpbox .hpbar b, .bparty .hpbar b, .hpbox .expbar b { color: #f8b030; background: #404040; padding: 0 calc(2 * var(--p)); border-radius: calc(2 * var(--p)); line-height: calc(7 * var(--p)); }
+.hpbox .track, .bparty .track { flex: 1; height: calc(4 * var(--p)); background: #506058; border: calc(1 * var(--p)) solid #404040; border-radius: calc(2 * var(--p)); overflow: hidden; }
+.hpbox .fill, .bparty .fill { display: block; height: 100%; }
+.hpbox .row3 { text-align: right; font-variant-numeric: tabular-nums; line-height: calc(9 * var(--p)); }
+.hpbox .expbar { display: flex; align-items: center; gap: calc(2 * var(--p)); font-size: calc(7 * var(--p)); }
+.hpbox .expbar .fill { background: #40a8f8; }
+.bstatus { font-size: calc(7 * var(--p)); color: #f8f8f8; padding: 0 calc(2 * var(--p)); border-radius: calc(2 * var(--p)); }
+.bstatus.poison, .bstatus.toxic { background: #a040a0; } .bstatus.burn { background: #e05038; } .bstatus.paralysis { background: #c0a020; }
+.bstatus.sleep { background: #808080; } .bstatus.freeze { background: #50a0d0; }
+/* The message window along the bottom, and the menus over it. */
+.bmsg {
+  position: absolute; left: 0; top: calc(112 * var(--p)); width: calc(240 * var(--p)); height: calc(48 * var(--p)); box-sizing: border-box;
+  padding: calc(6 * var(--p)) calc(12 * var(--p)); background: #284858; border: calc(3 * var(--p)) solid #c86848; border-radius: calc(4 * var(--p));
+  color: #f8f8f8; text-shadow: calc(1 * var(--p)) calc(1 * var(--p)) 0 #506878;
+}
+.bmsg p { margin: 0; height: calc(16 * var(--p)); white-space: pre; overflow: hidden; }
+.bmsg .more { position: absolute; right: calc(8 * var(--p)); bottom: calc(4 * var(--p)); color: #f8a848; animation: blink 1s steps(2) infinite; }
+.bmenu, .bmoves ul, .bmoves .binfo, .bparty {
+  position: absolute; margin: 0; list-style: none; box-sizing: border-box; background: #f8f8f8; color: #404040;
+  border: calc(3 * var(--p)) solid #506878; border-radius: calc(4 * var(--p));
+}
+.bmoves { position: absolute; inset: 0; }
+.bmenu { left: calc(120 * var(--p)); top: calc(112 * var(--p)); width: calc(120 * var(--p)); height: calc(48 * var(--p)); padding: calc(6 * var(--p)) calc(2 * var(--p)) calc(6 * var(--p)) calc(4 * var(--p)); display: grid; grid-template-columns: 1.3fr 1fr; font-size: calc(10 * var(--p)); align-content: center; gap: calc(2 * var(--p)) 0; }
+.bmoves ul { left: 0; top: calc(112 * var(--p)); width: calc(160 * var(--p)); height: calc(48 * var(--p)); padding: calc(6 * var(--p)) calc(4 * var(--p)); display: grid; grid-template-columns: 1fr 1fr; align-content: center; gap: calc(2 * var(--p)) 0; }
+.bmoves .binfo { left: calc(160 * var(--p)); top: calc(112 * var(--p)); width: calc(80 * var(--p)); height: calc(48 * var(--p)); padding: calc(6 * var(--p)) calc(4 * var(--p)) calc(6 * var(--p)) calc(6 * var(--p)); display: grid; align-content: center; gap: calc(2 * var(--p)); font-size: calc(9 * var(--p)); white-space: nowrap; }
+.binfo .pp.low { color: #e09020; } .binfo .pp.none { color: #e05038; }
+.bmenu li, .bmoves li, .bparty li { white-space: nowrap; overflow: hidden; }
+.bmenu li::before, .bmoves li::before, .bparty li::before { content: "\25B6"; visibility: hidden; margin-right: calc(2 * var(--p)); }
+.bmenu li.sel::before, .bmoves li.sel::before, .bparty li.sel::before { visibility: visible; }
+.bparty { left: calc(8 * var(--p)); top: calc(8 * var(--p)); width: calc(224 * var(--p)); max-height: calc(144 * var(--p)); padding: calc(4 * var(--p)) calc(8 * var(--p)); overflow: auto; }
+.bparty .bprompt { margin: 0 0 calc(4 * var(--p)); font-weight: 700; }
+.bparty ul { list-style: none; margin: 0; padding: 0; display: grid; gap: calc(3 * var(--p)); }
+.bparty li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cur name lv" ". bar hp"; column-gap: calc(4 * var(--p)); }
+.bparty li::before { grid-area: cur; }
+.bparty .name { grid-area: name; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.bparty .lv { grid-area: lv; }
+.bparty .hpbar { grid-area: bar; }
+.bparty .hpnum { grid-area: hp; font-variant-numeric: tabular-nums; }
+.bparty li[data-new] { color: #3878e0; }
+.bparty.forget li { grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "cur name lv hp"; }

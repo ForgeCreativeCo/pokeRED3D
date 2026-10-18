@@ -231,7 +231,7 @@ export interface PokemonFile {
   natures: { name: string; mods: number[] }[];
   abilities: Record<string, string>;
   /** PNG data URIs, for the species the scripts mention: front and back 64x64, icon 32x64 (two frames) */
-  pics: Record<string, { front: string; back: string; icon: string }>;
+  pics: Record<string, { front: string; back: string; icon: string; /** how far battle moves each picture down its frame, and lifts a foe that floats */ frontY: number; backY: number; elevation: number }>;
 }
 
 // ---- Items (build/data/items.json) ----
@@ -338,4 +338,8 @@ export interface BattleFile {
   terrains: Record<string, string>;
   /** songs for wild battles */
   music: { wild: string; wildVictory: string; caughtIntro: string; caught: string };
+  /** every string in src/battle_message.c by its C name, with FireRed's placeholders ({B_ATK_NAME_WITH_PREFIX}, …) */
+  text: Record<string, string>;
+  /** HP, ATTACK, DEFENSE, SPEED, SP. ATK, SP. DEF, accuracy, evasiveness */
+  statNames: string[];
 }

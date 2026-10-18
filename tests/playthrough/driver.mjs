@@ -29,10 +29,10 @@ export async function play(steps, { url, seed = 1 }) {
     // The party and an open menu are recorded only once there are any, so
     // steps before them read the same as ever.
     const snapshot = () => page.evaluate(() => {
-      const party = pokered.party(), menu = pokered.menu(), pic = pokered.monPic(), bag = pokered.bag();
+      const party = pokered.party(), menu = pokered.menu(), pic = pokered.monPic(), bag = pokered.bag(), battle = pokered.battleSummary();
       return {
         where: pokered.where(),
-        text: pokered.text(),
+        text: pokered.text() || pokered.battleText(),
         people: pokered.people(),
         flags: [...pokered.story.flags].sort(),
         vars: Object.fromEntries(Object.entries(pokered.story.vars).sort()),
@@ -40,12 +40,14 @@ export async function play(steps, { url, seed = 1 }) {
         ...(menu !== 'closed' && { menu }),
         ...(pic && { monPic: pic }),
         ...(bag.length && { bag }),
+        ...(battle !== 'closed' && { battle }),
       };
     });
     const call = (method, ...args) => page.evaluate(([m, a]) => pokered[m](...a), [method, args]);
     const state = () => page.evaluate(() => ({
-      where: pokered.where(), text: pokered.text(), busy: pokered.scriptDepth > 0,
-      choosing: !document.getElementById('yesno').hidden,
+      where: pokered.where(), text: pokered.text() || pokered.battleText(), busy: pokered.scriptDepth > 0,
+      // A YES / NO, or a battle menu: advance stops for the steps to choose.
+      choosing: !document.getElementById('yesno').hidden || /^battle (menu|moves|party|forget)/.test(pokered.battleState()),
     }));
     // Warps fade on real-time timers, so let real time pass as well as game time.
     const settle = async () => { await call('tick', 0.5); await page.waitForTimeout(500); await call('tick', 0.1); };

@@ -19,9 +19,10 @@ export class TextBox {
   private yes: HTMLElement;
   private no: HTMLElement;
 
-  constructor(private clock: Clock, private input: Input, private story: Story, doc: Document) {
+  /** `els`: a box of its own (the battle screen's), instead of the page's #textbox */
+  constructor(private clock: Clock, private input: Input, private story: Story, doc: Document, els?: { box: HTMLElement; line1: HTMLElement; line2: HTMLElement; more: HTMLElement }) {
     const $ = (id: string) => doc.getElementById(id)!;
-    this.box = $('textbox'); this.line1 = $('tb1'); this.line2 = $('tb2'); this.more = $('tbMore');
+    this.box = els?.box ?? $('textbox'); this.line1 = els?.line1 ?? $('tb1'); this.line2 = els?.line2 ?? $('tb2'); this.more = els?.more ?? $('tbMore');
     this.choice = $('yesno'); this.yes = $('yes'); this.no = $('no');
   }
 

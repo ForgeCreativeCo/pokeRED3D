@@ -47,7 +47,7 @@ Pokémon, Bag and save code is, so it runs under unit tests.
 
 ## What was baked
 
-Done in `tools/baker/lib/battle.js`, except battle text. These were added to the baker (`tools/baker/`) the way `pokemon.js` and `items.js`
+Done in `tools/baker/lib/battle.js`. These were added to the baker (`tools/baker/`) the way `pokemon.js` and `items.js`
 read the decomp: parse the source, never retype tables.
 
 | Data | Decomp source | Notes |
@@ -59,7 +59,7 @@ read the decomp: parse the source, never retype tables.
 | Battle backgrounds | `graphics/battle_terrain/` | Pick by the map's `battle_scene` and the tile you're on |
 | Battle music | `MUS_VS_WILD`, `MUS_VS_TRAINER`; the rival uses `MUS_ENCOUNTER_RIVAL` before | `tools/baker/lib/music.js` bakes any song by name: add them to the bake's song list |
 | Pokémon pictures | `pokemon.js`, `bakePokemon(withPictures)` | Pictures are baked only for species asked for. Add every species in the baked maps' encounter tables and trainer parties |
-| Battle text (**not yet**) | `data/text/*.inc`, `src/strings.c`, `data/battle_scripts_*.s` | "Wild PIDGEY appeared!", "Go! BULBASAUR!" and the rest: bake them by label with `uiText` in `tools/baker/lib/items.js` so the text box shows them like any other text |
+| Battle text | `src/battle_message.c` | Every string in the file, by its C name, with FireRed's placeholders kept (`battle.json` `text`); the party list's lines come from `src/strings.c` through `uiText` |
 
 ## FireRed's rules to port
 
@@ -162,16 +162,45 @@ for step 4), and move effects beyond the early game's: an unknown effect on a
 damaging move still hits, and an unknown status move fails. `isHandled`
 says which effects are in.
 
+## The battle screen
+
+`src/ui/battleScreen.ts` plays a battle: `Game.battle(foe, loseText?)`
+starts one where the player stands and resolves with `'won'`, `'lost'` or
+`'ran'`. While it's up, `Game.frame` only ticks the clock; the battle runs
+on it like a script.
+
+- **Layout:** everything sits in the GBA's 240x160 pixels, scaled to the
+  window (`--p` is one GBA pixel, from container units). The background comes
+  from `battleTerrain` (`src/battle/terrain.ts`, `BattleSetup_GetTerrainId`);
+  Pokémon are centred at `sBattlerCoords`, moved by each picture's baked
+  offset and a foe's elevation. HP boxes, the message window and the menus
+  are CSS in FireRed's colours.
+- **Text:** each engine event becomes its `src/battle_message.c` string, with
+  the placeholders filled ("Foe" / "Wild" prefixes, the rival's name for
+  rival classes). Messages ending in `\p` wait for A; others stay up for 48
+  frames, as battle text does.
+- **Flow:** the opening (trainer, sent out, "Go!"), FIGHT / BAG / POKéMON /
+  RUN, the move list with PP and type, switching, "Use next POKéMON?" in the
+  wild, move learning with "1, 2, and… Poof!", the win (prize money is
+  added) or the whiteout text. Battle and victory songs play, and the map's
+  song comes back after.
+- **Phones:** an on-screen B button now sits beside A, for backing out of
+  menus.
+
+Not yet: the BAG (it says items can't be used now), the stat window on a
+level-up, the low-HP warning sound, move animations, a whiteout taking you
+home, and anything in the world that starts a battle (steps 4 and 5). For
+now the test hook's `battle()` is the way in.
+
 ## Suggested order
 
 1. ~~**Bake** the type chart, Route 1's FireRed encounters, Blue's lab parties,
-   battle backgrounds, battle music and the extra Pokémon pictures.~~ Done.
-   Battle text is still to bake, with the battle screen.
+   battle backgrounds, battle music and the extra Pokémon pictures.~~ Done,
+   with the battle text.
 2. ~~**Battle logic** in `src/battle/`, as pure code.~~ Done: see "The battle
    engine" below.
-3. **The battle screen**, in FireRed's layout: the two Pokémon on their
-   platforms, HP boxes, FIGHT / BAG / POKéMON / RUN, the move list with PP and
-   type, battle text through the existing text box.
+3. ~~**The battle screen**, in FireRed's layout.~~ Done: see "The battle
+   screen" below.
 4. **Blue in the lab** via `trainerbattle_earlyrival`: win or lose, the
    script carries on as in FireRed. Record a play-through of it.
 5. **Wild encounters** in Route 1's tall grass, with RUN.

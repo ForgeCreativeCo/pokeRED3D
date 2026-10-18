@@ -84,7 +84,7 @@ const battleData: BattleFile = {
       money: 4, pic: 'TRAINER_PIC_RIVAL_EARLY', music: { encounter: '', battle: '', victory: '' },
     },
   },
-  trainerPics: {}, playerPics: {}, terrains: {}, music: { wild: '', wildVictory: '', caughtIntro: '', caught: '' },
+  trainerPics: {}, playerPics: {}, terrains: {}, music: { wild: '', wildVictory: '', caughtIntro: '', caught: '' }, text: {}, statNames: [],
 };
 
 const PLAYER = { id: 0x12345678, name: 'RED' };

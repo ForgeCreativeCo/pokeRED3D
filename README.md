@@ -88,7 +88,7 @@ Other commands:
 | `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
 | `npm run build:artifact` | The single-file page shaped for publishing as a claude.ai Artifact: `dist-single/pokered3d.html` |
 | `npm test` | Unit tests |
-| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`, `save`) in a build and compare it with its golden transcript |
+| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`, `save`, `battle`) in a build and compare it with its golden transcript |
 
 Map names are folder names under `vendor/pokefirered/data/maps`. The first map
 in a bake is the origin; connected maps join it, and interiors become their
@@ -124,7 +124,7 @@ loads the baked files (`build/data/*.json` and each map's `map.json` and
 | `save/` | Saving and loading the story and where you stand, in browser storage |
 | `pokemon/` | Pokémon as FireRed keeps them: creating one, stats, experience, nature, gender, ability, starting moves, status |
 | `battle/` | Battles as FireRed runs them, as pure logic: damage, types, accuracy, critical hits, turn order, move effects, status, experience and level-ups, running; each turn comes back as events for the battle screen |
-| `ui/` | The text box and YES/NO, emotes, the Pokémon picture window, the start menu and its screens (party, summaries, Bag, trainer card, OPTION, Pokédex), the Continue screen, the tuning panel |
+| `ui/` | The text box and YES/NO, emotes, the Pokémon picture window, the start menu and its screens (party, summaries, Bag, trainer card, OPTION, Pokédex), the Continue screen, the battle screen, the tuning panel |
 | `audio/` | The synth that plays FireRed's songs |
 | `input/` | Keyboard, d-pad and A button |
 | `render/` | The scene, the follow camera, and the GBA view for compare mode |
@@ -181,6 +181,9 @@ pokered.people();                       // everyone in the area
 pokered.party();                        // the party: species, level, HP, moves
 pokered.bag();                          // the Bag's contents
 await pokered.press('start');           // open the start menu; menu() says which screen is up
+pokered.give('SPECIES_BULBASAUR', 5);   // add a Pokémon to the party
+await pokered.battle({ wild: 'SPECIES_PIDGEY', level: 3 });  // or { trainer: 'TRAINER_…' }, where you stand
+pokered.battleState();                  // the battle's menu or text, and both HPs
 ```
 
 **Play-throughs** use it to play a scene end to end in a real browser
@@ -191,8 +194,10 @@ Pokémon picture once there are some. `tests/playthrough/opening.json` plays
 the opening from the bedroom to Blue's challenge; `party.json` plays it again,
 then opens the party, reads every summary page and switches; `save.json` gets
 the Route 1 clerk's Potion, checks the Bag and the trainer card, saves,
-reloads the page and continues. A `["reload"]` step reloads the page with
-its storage, as closing and reopening the game would.
+reloads the page and continues; `battle.json` beats Blue's Squirtle with
+Tackle, then meets a wild Pidgey in Route 1's grass and runs. A `["reload"]`
+step reloads the page with its storage, as closing and reopening the game
+would; `["advance"]` stops at battle menus as it does at a YES / NO.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -220,7 +225,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
-| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · a. battle scene and UI · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
+| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track
@@ -239,7 +244,9 @@ This runs alongside the steps above:
 
 ### Known gaps
 
-- Battles are skipped: trainers say their challenge and the scene continues.
+- Nothing in the world starts a battle yet: trainers say their challenge and
+  the scene continues, and tall grass has no encounters. The battle screen
+  itself works; the test hook's `battle()` starts one.
 - There's no naming screen yet: saying YES to a nickname keeps the species
   name.
 - Items can't be used yet (Oak tells you it isn't the time), and there's no

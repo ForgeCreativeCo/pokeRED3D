@@ -21,11 +21,14 @@ import { Emote } from './ui/emote';
 import { Panel, pretty } from './ui/panel';
 import { MonPic } from './ui/monPic';
 import { PartyMenu } from './ui/party';
-import { monRandom } from './core/random';
+import { battleRandom, monRandom } from './core/random';
 import type { ItemData, PokemonFile } from './data/types';
 import { StartMenu } from './ui/startMenu';
 import { BagMenu, OptionsMenu, Pokedex, TitleScreen, TrainerCard } from './ui/screens';
 import { applySave, makeSave, readSave, writeSave, type SaveFile } from './save/save';
+import { BattleScreen, type BattleOutcome } from './ui/battleScreen';
+import { battleTerrain } from './battle/terrain';
+import type { Mon } from './pokemon/mon';
 
 /** In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows. */
 const GBA_ROWS = 10;
@@ -51,6 +54,7 @@ export class Game implements ScriptHost {
   readonly partyMenu: PartyMenu;
   readonly items: Record<string, ItemData>;
   readonly startMenu: StartMenu;
+  readonly battleScreen: BattleScreen;
   /** shown at start-up when there's a save: CONTINUE or NEW GAME */
   readonly title: TitleScreen | null;
   /** a save from another game is in storage: the first save asks before overwriting it */
@@ -114,6 +118,7 @@ export class Game implements ScriptHost {
     this.title = saved ? new TitleScreen(this.input, doc, saved, data.pokemon) : null;
     this.title?.show();
     this.textbox = new TextBox(this.clock, this.input, this.story, doc);
+    this.battleScreen = new BattleScreen(this.clock, this.input, this.story, doc, data.pokemon, data.battle, this.music, data.scripts.text);
     this.emote = new Emote(this.clock, doc);
     this.vm = new ScriptVM(data.scripts, this);
     this.rig = new CameraRig(data.maps, D.camera.preset, this.canvas);
@@ -148,9 +153,19 @@ export class Game implements ScriptHost {
     this.setCompare(location.hash === '#compare');
   }
 
-  /** Nothing else is going on: no scene, warp or step, and no menu open. */
+  /** Nothing else is going on: no scene, warp or step, no menu open and no battle. */
   private get idle() {
-    return !this.vm.running && !this.warping && !this.player.from && !this.startMenu.open && !this.title?.open;
+    return !this.vm.running && !this.warping && !this.player.from && !this.startMenu.open && !this.title?.open && !this.battleScreen.open;
+  }
+
+  /**
+   * A battle where the player stands: the background comes from the tile and
+   * the map (BattleSetup_GetTerrainId). Resolves when it's over.
+   */
+  battle(foe: { wild: Mon } | { trainer: string }, loseText?: string): Promise<BattleOutcome> {
+    const c = this.world.locate(this.player.x, this.player.y);
+    const terrain = battleTerrain(this.world.behaviorAt(this.player.x, this.player.y) ?? 'MB_NORMAL', c?.m.data.mapType ?? 'MAP_TYPE_ROUTE', c?.m.data.battleScene);
+    return this.battleScreen.run({ foe, terrain, rng: battleRandom, loseText: loseText && this.texts[loseText] });
   }
 
   /** Open the start menu, as START does. */
@@ -377,6 +392,8 @@ export class Game implements ScriptHost {
       return;
     }
     this.story.playTime += dt;
+    // A battle covers the world, which waits behind it; the battle runs on the clock.
+    if (this.battleScreen.open) return;
     // The start menu (and the screens it opens) covers the world, which waits behind it as in FireRed.
     if (this.startMenu.open) { this.startMenu.update(); return; }
     if (input.buttons.startPressed) { input.buttons.startPressed = false; this.openStartMenu(); if (this.startMenu.open) return; }

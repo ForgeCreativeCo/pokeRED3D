@@ -46,7 +46,10 @@ export type BattleEvent =
   | { type: 'status-end'; side: Side; status: 'sleep' | 'freeze' }
   /** couldn't move: fast asleep, frozen solid, fully paralysed, flinched */
   | { type: 'cant-move'; side: Side; reason: 'sleep' | 'freeze' | 'paralysis' | 'flinch' }
+  /** is confused (before it tries to move) */
   | { type: 'confused'; side: Side }
+  /** became confused */
+  | { type: 'confusion-start'; side: Side }
   | { type: 'confusion-hurt'; side: Side; amount: number; hp: number }
   | { type: 'confusion-end'; side: Side }
   | { type: 'seeded'; side: Side }
@@ -448,7 +451,7 @@ export class Battle {
     const b = this.active[side];
     if (this.fighter(side).ability === 'ABILITY_OWN_TEMPO' || b.confusion > 0) { if (!secondary) ev.push({ type: 'fail' }); return; }
     b.confusion = (this.r16() & 3) + 2;
-    ev.push({ type: 'confused', side });
+    ev.push({ type: 'confusion-start', side });
   }
 
   private heal(side: Side, amount: number, ev: BattleEvent[]) {

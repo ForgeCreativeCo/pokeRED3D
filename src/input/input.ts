@@ -1,4 +1,4 @@
-// Keyboard, the on-screen d-pad and A button. Directions are held; A and B
+// Keyboard, the on-screen d-pad and A and B buttons. Directions are held; A and B
 // also latch a press, taken once by whatever is waiting for one. Menus read
 // directions as presses too (one move per press), from `taken`.
 
@@ -66,6 +66,11 @@ export class Input {
     const aBtn = doc.getElementById('aBtn')!;
     aBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); buttons.aPressed = true; buttons.a = true; aBtn.classList.add('held'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) aBtn.addEventListener(ev, () => { buttons.a = false; aBtn.classList.remove('held'); });
+    const bBtn = doc.getElementById('bBtn');
+    if (bBtn) {
+      bBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); buttons.bPressed = true; buttons.b = true; bBtn.classList.add('held'); });
+      for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) bBtn.addEventListener(ev, () => { buttons.b = false; bBtn.classList.remove('held'); });
+    }
 
     addEventListener('keydown', (e) => {
       const dir = keyDirs[e.key.toLowerCase()];

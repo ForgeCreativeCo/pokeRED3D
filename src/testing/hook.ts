@@ -4,7 +4,8 @@
 
 import type { Game } from '../game';
 import type { Dir } from '../data/types';
-import { displayName } from '../pokemon/mon';
+import { createMon, displayName } from '../pokemon/mon';
+import { monRandom } from '../core/random';
 
 // Yield to the page between test frames (a message-channel task: background tabs don't slow it down),
 // so scripts waiting on a frame get to continue, as they do between real animation frames.
@@ -65,6 +66,36 @@ export function installHook(game: Game) {
     get money() { return game.story.money; },
     /** The Pokémon showmonpic is showing ('' when none). */
     monPic() { return game.monPic.shown; },
+    /**
+     * Start a battle where the player stands, without waiting for it: a wild
+     * Pokémon (`{ wild: 'SPECIES_PIDGEY', level: 3 }`) or a trainer (`{ trainer: 'TRAINER_…' }`).
+     */
+    async battle(foe: { wild: string; level: number } | { trainer: string }) {
+      const f = 'wild' in foe ? { wild: createMon(game.pokemon, foe.wild, foe.level, monRandom, { id: 0, name: '' }) } : foe;
+      game.battle(f).then((outcome) => { hook.lastBattle = outcome; });
+      await hook.tick(0.1);
+      return hook.battleState();
+    },
+    /** Add a Pokémon to the party, as givemon would. */
+    give(species: string, level: number) {
+      game.story.party.push(createMon(game.pokemon, species, level, monRandom, { id: game.story.trainerId, name: game.story.names.PLAYER }));
+      game.story.register(species, true);
+      return hook.party();
+    },
+    /** How the last battle ended: 'won', 'lost' or 'ran' (null before any). */
+    lastBattle: null as string | null,
+    /** The battle on screen: its menu or text, and both Pokémon's HP ('closed' when there's none). */
+    battleState() {
+      const s = game.battleScreen;
+      return s.open ? `${s.state} | ${s.hp}` : 'closed';
+    },
+    /** The battle without its text (which play-throughs keep only as a hash): the menu and cursor, and both HPs. */
+    battleSummary() {
+      const s = game.battleScreen;
+      return s.open ? `${s.state.startsWith('battle text') ? 'battle text' : s.state} | ${s.hp}` : 'closed';
+    },
+    /** What the battle's message window shows ('' when no battle). */
+    battleText() { return game.battleScreen.open ? game.battleScreen.text : ''; },
     /** What the text box shows right now ('' when closed). */
     text() { return game.textbox.shown; },
     where() {

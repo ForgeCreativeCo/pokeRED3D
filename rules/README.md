@@ -222,7 +222,9 @@ the decomp:
   rival's name is the decomp's placeholder; the game shows the rival's name.
 - **Pictures:** each baked trainer's front picture with its palette and
   vertical offset, and the player's back pictures (Red and Leaf, five 64x64
-  frames each). Pokémon pictures cover the wild and trainer Pokémon too.
+  frames each). Pokémon pictures cover the wild and trainer Pokémon too,
+  and each carries where battle puts it: `gMonFrontPicCoords` /
+  `gMonBackPicCoords` offsets and `gEnemyMonElevation`.
 - **Backgrounds:** every terrain `BattleSetup_GetTerrainId` can pick
   (except underwater), drawn from `sBattleTerrainTable`'s tiles, tilemap
   and palette into the 240x112 scene above the text box. Colour 0 is left
@@ -230,6 +232,9 @@ the decomp:
 - **Songs:** wild and trainer battle themes, victory themes and the catch
   fanfare are added to `music.json`. `scripts.json` gains the
   `RIVAL_BATTLE_*` flags `trainerbattle_earlyrival` takes.
+- **Text:** every string in `src/battle_message.c` by its C name, and the
+  stat names in `gStatNamesTable`'s order, placeholders kept for the battle
+  screen to fill.
 
 ## Music
 

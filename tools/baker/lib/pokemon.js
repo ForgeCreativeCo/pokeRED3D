@@ -138,7 +138,14 @@ function pictures(species) {
   const png = (sym) => P.file(sym)?.replace(/\.4bpp(\.lz)?$/, '.png');
   const pal = readJascPal(P.file(P.pal[species]).replace(/\.gbapal(\.lz)?$/, '.pal'));
   const iconPal = readJascPal(`graphics/pokemon/icon_palettes/icon_palette_${P.iconPal[species] ?? 0}.pal`);
-  return { front: recolor(png(P.front[species]), pal), back: recolor(png(P.back[species]), pal), icon: recolor(png(P.icon[species]), iconPal) };
+  // Where battle puts them: gMonFrontPicCoords / gMonBackPicCoords push the picture down
+  // its 64x64 frame, and gEnemyMonElevation lifts floating and flying foes.
+  const y = (table) => Number(read(`src/data/pokemon_graphics/${table}`).match(new RegExp(`\\[${species}\\]\\s*=\\s*\\{[^}]*\\.y_offset\\s*=\\s*(\\d+)`))?.[1] ?? 0);
+  const elevation = Number(read('src/data/pokemon_graphics/enemy_mon_elevation.h').match(new RegExp(`\\[${species}\\]\\s*=\\s*(\\d+)`))?.[1] ?? 0);
+  return {
+    front: recolor(png(P.front[species]), pal), back: recolor(png(P.back[species]), pal), icon: recolor(png(P.icon[species]), iconPal),
+    frontY: y('front_pic_coordinates.h'), backY: y('back_pic_coordinates.h'), elevation,
+  };
 }
 
 /**
