@@ -98,6 +98,30 @@ export async function play(steps, { url, seed = 1 }) {
           }
         }
         entry.said = said;
+      } else if (method === 'fight') {
+        // ['fight', max]: in a battle, choose FIGHT and the first move every
+        // turn, send out the next Pokémon when one faints, and read every
+        // message once it has finished typing, until the battle is over.
+        const [max = 600] = args;
+        const said = [];
+        let last = null;
+        for (let i = 0; i < max; i++) {
+          const b = await call('battleState');
+          if (b === 'closed') break;
+          if (/^battle (menu|moves)/.test(b)) { await call('press', 'a', 0.2); last = null; continue; }
+          if (/^battle party/.test(b)) { await call('press', 'down', 0.1); await call('press', 'a', 0.3); continue; }
+          if (/^battle forget/.test(b)) { await call('press', 'b', 0.3); continue; }
+          const t = await call('battleText');
+          if (t && t === last) {
+            if (t !== said.at(-1)) said.push(t);
+            await call('press', 'a', 0.1);
+            last = null;
+          } else {
+            last = t;
+            await call('tick', 0.2);
+          }
+        }
+        entry.said = said;
       } else if (method === 'reload') {
         // ['reload']: reload the page, as closing and reopening the game would (storage stays).
         await page.reload();

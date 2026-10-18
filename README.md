@@ -30,6 +30,8 @@ FireRed's opening, from a new save:
 4. Blue complains, Oak offers three Poké Balls, and you choose your starter:
    a real level 5 Pokémon joins your party. Blue takes his, then challenges
    you on the way out.
+5. Your first battle, with Oak talking you through it as in FireRed. Win or
+   lose (no whiteout here: Oak pays), Blue says his piece and leaves.
 
 Along the way:
 
@@ -59,7 +61,7 @@ Along the way:
   and CONTINUE puts you back where you saved, with your party, Bag, money,
   Pokédex, time and every story flag.
 
-Not yet: battles, using items, nicknames.
+Not yet: wild Pokémon, using items, nicknames.
 
 ## Getting started
 
@@ -191,13 +193,15 @@ pokered.battleState();                  // the battle's menu or text, and both H
 transcript: where the player is, what the text box says, who is where, and
 the story's flags and variables, and the party, any open menu and any
 Pokémon picture once there are some. `tests/playthrough/opening.json` plays
-the opening from the bedroom to Blue's challenge; `party.json` plays it again,
+the opening from the bedroom through Blue's battle and out of the lab;
+`party.json` plays it again,
 then opens the party, reads every summary page and switches; `save.json` gets
 the Route 1 clerk's Potion, checks the Bag and the trainer card, saves,
 reloads the page and continues; `battle.json` beats Blue's Squirtle with
 Tackle, then meets a wild Pidgey in Route 1's grass and runs. A `["reload"]`
 step reloads the page with its storage, as closing and reopening the game
-would; `["advance"]` stops at battle menus as it does at a YES / NO.
+would; `["advance"]` stops at battle menus as it does at a YES / NO, and
+`["fight"]` uses the first move every turn until the battle is over.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -225,7 +229,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Restructure into a game project** | TypeScript + Vite + three.js, split into modules (world, characters, scripts, UI, audio, input); baked data loaded as files; unit tests and scripted play-throughs; single-file builds for the test page; the opening replays the same before and after |
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
-| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · c. wild encounters in tall grass · d. trainer battles, starting with Blue in the lab · e. catching |
+| 5 | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · ✓ Blue in the lab (`trainerbattle_earlyrival`, Oak's tutorial) · c. wild encounters in tall grass · e. catching |
 | 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track
@@ -244,9 +248,9 @@ This runs alongside the steps above:
 
 ### Known gaps
 
-- Nothing in the world starts a battle yet: trainers say their challenge and
-  the scene continues, and tall grass has no encounters. The battle screen
-  itself works; the test hook's `battle()` starts one.
+- Tall grass has no encounters yet, and losing outside Blue's lab battle
+  doesn't take you home (no whiteout warp yet). Double battles (Route 21
+  North's Lil & Ian) still just say their challenge.
 - There's no naming screen yet: saying YES to a nickname keeps the species
   name.
 - Items can't be used yet (Oak tells you it isn't the time), and there's no

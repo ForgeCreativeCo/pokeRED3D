@@ -11,7 +11,7 @@ import type { Emote } from '../../src/ui/emote';
 import { makeMap } from './fixtures';
 
 /** A VM over made-up scripts, with the text box and music recorded instead of shown. */
-function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = {}, mapData = {}) {
+function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = {}, mapData = {}, battleOutcome: 'won' | 'lost' | 'ran' = 'won') {
   const map = makeMap('Town', ['.....', '.....', '.....'], { data: mapData });
   const world = new World([map]);
   const said: string[] = [];
@@ -22,6 +22,8 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
     close() {}, hideChoice() {},
   } as unknown as TextBox;
   const pics: string[] = [];
+  const battles: { foe: { trainer: string }; opts: object }[] = [];
+  const healed: number[] = [];
   const item = (name: string, pocket: ItemData['pocket'] = 'ITEMS'): ItemData => ({ name, price: 300, pocket, description: '', param: 20, fieldUse: null, important: pocket === 'KEY_ITEMS' });
   const items = { ITEM_POTION: item('POTION'), ITEM_OAKS_PARCEL: item("OAK'S PARCEL", 'KEY_ITEMS') };
   const pokemon = {
@@ -40,9 +42,11 @@ function setup(scripts: Record<string, Command[]>, more: Partial<ScriptsFile> = 
     pokemon,
     items,
     monPic: { show: (s) => { pics.push(s); }, hide: () => { pics.push('hidden'); } },
+    battle: async (foe, opts) => { battles.push({ foe, opts }); return battleOutcome; },
+    healParty: () => { healed.push(1); },
   };
   const data: ScriptsFile = { scripts, text: {}, consts: {}, textColors: {}, startFlags: [], ...more };
-  return { vm: new ScriptVM(data, host), host, said, played, pics, map, player, npcs };
+  return { vm: new ScriptVM(data, host), host, said, played, pics, map, player, npcs, battles, healed };
 }
 
 /** Run frames until the VM is idle, finishing any step as soon as it starts. */
@@ -213,5 +217,52 @@ describe('ScriptVM', () => {
     const t = setup({ Main: [['bufferspeciesname', 'STR_VAR_1', 'SPECIES_MR_MIME']] });
     await t.vm.run('Main', null);
     expect(t.host.story.names.STR_VAR_1).toBe('MR MIME');
+  });
+});
+
+describe('trainer battles', () => {
+  const consts = { RIVAL_BATTLE_HEAL_AFTER: '1', RIVAL_BATTLE_TUTORIAL: '3' };
+  const scripts = {
+    Lab: [
+      ['trainerbattle_earlyrival', 'TRAINER_RIVAL', 'RIVAL_BATTLE_TUTORIAL', 'Text_Defeat', 'Text_Victory'],
+      ['setvar', 'VAR_AFTER', '1'],
+    ] as Command[],
+  };
+
+  it("runs Blue's lab battle as the tutorial, and carries on when the player wins", async () => {
+    const t = setup(scripts, { consts });
+    t.vm.run('Lab', null);
+    await settle(t);
+    expect(t.battles).toEqual([{ foe: { trainer: 'TRAINER_RIVAL' }, opts: { loseText: 'Text_Defeat', winText: 'Text_Victory', healAfter: true, firstBattle: true } }]);
+    expect(t.host.story.vars.VAR_RESULT).toBe(0);
+    expect(t.host.story.vars.VAR_AFTER).toBe(1);
+    expect(t.host.story.flags.has('TRAINER_RIVAL')).toBe(true);
+    expect(t.healed).toEqual([]);
+  });
+
+  it('heals the party and carries on with VAR_RESULT 1 when the player loses', async () => {
+    const t = setup(scripts, { consts }, {}, 'lost');
+    t.vm.run('Lab', null);
+    await settle(t);
+    expect(t.host.story.vars.VAR_RESULT).toBe(1);
+    expect(t.host.story.vars.VAR_AFTER).toBe(1);
+    expect(t.healed).toEqual([1]);
+  });
+
+  it("skips a trainer already beaten, on to the after-battle lines", async () => {
+    const t = setup({ Talk: [['trainerbattle_single', 'TRAINER_X', 'Text_Intro', 'Text_Lose'], ['setvar', 'VAR_AFTER', '1']] as Command[] }, { startFlags: ['TRAINER_X'] });
+    t.vm.run('Talk', null);
+    await settle(t);
+    expect(t.battles).toEqual([]);
+    expect(t.host.story.vars.VAR_AFTER).toBe(1);
+  });
+
+  it('battles a trainer not yet beaten, then ends the script', async () => {
+    const t = setup({ Talk: [['trainerbattle_single', 'TRAINER_X', 'Text_Intro', 'Text_Lose'], ['setvar', 'VAR_AFTER', '1']] as Command[] });
+    t.vm.run('Talk', null);
+    await settle(t);
+    expect(t.battles.map((b) => b.foe)).toEqual([{ trainer: 'TRAINER_X' }]);
+    expect(t.host.story.flags.has('TRAINER_X')).toBe(true);
+    expect(t.host.story.vars.VAR_AFTER).toBeUndefined();
   });
 });

@@ -345,3 +345,22 @@ describe('a battle', () => {
     expect(types(ev)).toContain('recoil');
   });
 });
+
+describe('the first battle', () => {
+  it("can't miss or crit before the first damage, and Oak speaks up once", () => {
+    // Every roll 96: 96 % 100 + 1 = 97 misses Tackle's 95, and 96 % 16 = 0 is a critical hit.
+    const party = [bulbasaur()];
+    const battle = new Battle({ pokemon, battle: battleData, party, playerId: PLAYER.id, foe: { trainer: 'TRAINER_RIVAL_OAKS_LAB_SQUIRTLE' }, rng: rolls(96), firstBattle: true });
+    const first = battle.turn({ type: 'move', slot: 0 });
+    // Bulbasaur's Tackle hits anyway, without the crit (5 at 100%); Blue's Tackle misses as usual.
+    expect(first.slice(0, 3)).toEqual([
+      { type: 'move', side: 'player', move: 'MOVE_TACKLE' },
+      { type: 'damage', side: 'foe', amount: 5, hp: 14, crit: false, effectiveness: 'normal' },
+      { type: 'oak', line: 'damage' },
+    ]);
+    expect(first).toContainEqual({ type: 'miss', side: 'foe' });
+    // After that, the usual rules: the same roll misses.
+    expect(battle.turn({ type: 'move', slot: 0 })).toContainEqual({ type: 'miss', side: 'player' });
+    expect(types(battle.turn({ type: 'move', slot: 1 }))).toContain('oak');
+  });
+});

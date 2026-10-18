@@ -35,6 +35,12 @@ export interface ScriptHost {
   npcs: Actor[];
   areaActors(): Actor[];
   warpTo(dest: LoadedMap, x: number, y: number, arrive?: string | null): Promise<void>;
+  /** a trainer battle; resolves how it ended. Texts are script text labels. */
+  battle(foe: { trainer: string }, opts: { loseText?: string; winText?: string; firstBattle?: boolean; healAfter?: boolean }): Promise<'won' | 'lost' | 'ran'>;
+  /** HealPlayerParty */
+  healParty(): void;
+  /** the trainers, for their encounter music */
+  battleData?: { trainers: Record<string, { music: { encounter: string } }> };
 }
 
 /** NPC_TEXT_COLOR_MALE / FEMALE / MON / NEUTRAL */
@@ -222,8 +228,46 @@ export class ScriptVM {
             story.vars.VAR_RESULT = ok ? 1 : 0;
             break;
           }
-          case 'trainerbattle_single': case 'trainerbattle_double': {
-            // Battles come later: show the challenge, then stop.
+          case 'trainerbattle_earlyrival': {
+            // Blue in Oak's lab (TRAINER_BATTLE_EARLY_RIVAL): no intro, straight into battle. The
+            // flags say whether it's the tutorial and whether losing heals instead of whiting out;
+            // either way the script carries on, with VAR_RESULT 1 if the player lost (CB2_EndTrainerBattle).
+            const flags = Number(value(args[1])) || 0;
+            const healAfter = !!(flags & Number(value('RIVAL_BATTLE_HEAL_AFTER')));
+            const outcome = await this.host.battle({ trainer: args[0] }, {
+              loseText: args[2], winText: args[3], healAfter,
+              firstBattle: (flags & Number(value('RIVAL_BATTLE_TUTORIAL'))) === Number(value('RIVAL_BATTLE_TUTORIAL')),
+            });
+            story.vars.VAR_RESULT = outcome === 'lost' ? 1 : 0;
+            if (outcome === 'lost') this.host.healParty();
+            story.flags.add(args[0]); // SetBattledTrainerFlag
+            music.play(this.currentMap?.data.music); // CB2_ReturnToFieldContinueScriptPlayMapMusic
+            break;
+          }
+          case 'trainerbattle_single': {
+            // A trainer already beaten lets the script go on to their after-battle lines. Otherwise:
+            // their encounter music and challenge, the battle, and the script ends (or goes on to
+            // its event script, args[3], as TRAINER_BATTLE_CONTINUE_SCRIPT does).
+            if (story.flags.has(args[0])) break;
+            const intro = text[args[1]];
+            if (target) faceToward(target, player);
+            const encounter = this.host.battleData?.trainers[args[0]]?.music.encounter;
+            if (encounter) music.play(encounter);
+            if (intro != null) await textbox.say(intro, { color: ctx.color });
+            textbox.close();
+            const outcome = await this.host.battle({ trainer: args[0] }, { loseText: args[2] });
+            story.flags.add(args[0]);
+            music.play(this.currentMap?.data.music);
+            if (outcome === 'lost') { this.host.healParty(); pc = body.length; stack.length = 0; break; }
+            if (args[3] && args[3] !== 'FALSE' && jump(args[3])) break;
+            pc = body.length; stack.length = 0;
+            break;
+          }
+          case 'special':
+            if (args[0] === 'HealPlayerParty') this.host.healParty();
+            break;
+          case 'trainerbattle_double': {
+            // Double battles come later: show the challenge, then stop.
             const intro = text[args[1]];
             if (target) faceToward(target, player);
             if (intro != null) await textbox.say(intro, { color: ctx.color });

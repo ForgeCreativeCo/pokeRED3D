@@ -23,6 +23,8 @@
   ["step","left",2],
   ["step","down",3],
   ["advance"],
+  ["fight"],
+  ["advance"],
   ["step","down",4],
   ["step","down",1],
   ["openParty"],

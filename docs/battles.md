@@ -26,11 +26,10 @@ first for the overall shape.
   accuracy, PP, effect, effect chance, target, priority, contact).
   `build/data/items.json` has every item (POKé BALLs included) with its
   pocket.
-- **Battles are skipped.** In `src/scripts/vm.ts`, `trainerbattle_single`
-  and `trainerbattle_double` show the trainer's intro text and end the script.
-  `trainerbattle_earlyrival` (Blue in the lab) isn't handled at all: it falls
-  through `default`, so the scene goes straight on to Blue's after-battle
-  lines. Tall grass has no encounters.
+- **Trainer battles are real.** `trainerbattle_earlyrival` (Blue in the lab)
+  and `trainerbattle_single` start a battle (see "Trainer battles in
+  scripts" below). `trainerbattle_double` and the rematch variants still
+  show the challenge and stop. Tall grass has no encounters.
 
 ## Where battles plug in
 
@@ -157,8 +156,7 @@ personality the baker works out.
 Not yet: double battles (Route 21 North's Lil & Ian), held items, weather,
 using items in battle, catching, the "Will you switch?" prompt when a
 trainer sends out the next one, trainers' AI (they pick a move at random,
-like wild Pokémon), the first battle's tutorial rules (`RIVAL_BATTLE_TUTORIAL`:
-for step 4), and move effects beyond the early game's: an unknown effect on a
+like wild Pokémon), and move effects beyond the early game's: an unknown effect on a
 damaging move still hits, and an unknown status move fails. `isHandled`
 says which effects are in.
 
@@ -189,8 +187,37 @@ on it like a script.
 
 Not yet: the BAG (it says items can't be used now), the stat window on a
 level-up, the low-HP warning sound, move animations, a whiteout taking you
-home, and anything in the world that starts a battle (steps 4 and 5). For
-now the test hook's `battle()` is the way in.
+home, and wild encounters (step 5). The test hook's `battle()` starts any
+battle where the player stands.
+
+## Trainer battles in scripts
+
+`src/scripts/vm.ts` runs them through `ScriptHost.battle` (the game's
+`battle()`), waiting for the battle like any other scene step.
+
+- **`trainerbattle_earlyrival`** (TRAINER_BATTLE_EARLY_RIVAL): no intro text,
+  straight into battle. Its flags decide the rest, as in
+  `CB2_EndTrainerBattle`: with `RIVAL_BATTLE_HEAL_AFTER` a loss heals the
+  party instead of whiting out, and either way the script goes on with
+  `VAR_RESULT` 1 if the player lost. The rival's lose and win texts come
+  from the command. Afterwards the map's music plays again and the trainer is
+  marked as battled.
+- **The first battle** (`RIVAL_BATTLE_TUTORIAL`, BATTLE_TYPE_FIRST_BATTLE):
+  the engine's `firstBattle` option. The player's damaging moves can't miss
+  until the foe first takes damage, their stat moves can't miss until a foe's
+  stat first falls, and there are no critical hits before that first damage.
+  Oak speaks at FireRed's points (`battle_controller_oak_old_man.c`): once
+  both Pokémon are out, after the first damage and the first lowered stat
+  (engine `oak` events), on trying to run, after the prize money, and after
+  the rival's victory line.
+- **`trainerbattle_single`**: a trainer already beaten lets the script go
+  on to their after-battle lines. Otherwise: their encounter music
+  (`PlayTrainerEncounterMusic`), their challenge, the battle, then the script
+  ends (or goes to its event script).
+- **`special HealPlayerParty`**: full HP and PP, status cleared.
+
+Trainers beaten are kept as story flags named by their id
+(`TRAINER_RIVAL_OAKS_LAB_CHARMANDER`), so a save remembers them.
 
 ## Suggested order
 
@@ -201,8 +228,8 @@ now the test hook's `battle()` is the way in.
    engine" below.
 3. ~~**The battle screen**, in FireRed's layout.~~ Done: see "The battle
    screen" below.
-4. **Blue in the lab** via `trainerbattle_earlyrival`: win or lose, the
-   script carries on as in FireRed. Record a play-through of it.
+4. ~~**Blue in the lab** via `trainerbattle_earlyrival`.~~ Done: see "Trainer
+   battles in scripts" below.
 5. **Wild encounters** in Route 1's tall grass, with RUN.
 6. **Catching** with POKé BALLs from the Bag, filling the Pokédex
    (`Story.register`).

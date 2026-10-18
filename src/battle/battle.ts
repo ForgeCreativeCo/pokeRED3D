@@ -68,7 +68,13 @@ export type BattleEvent =
   | { type: 'run'; ok: boolean; reason?: 'trainer' }
   /** the player must send out another Pokémon (switchIn) */
   | { type: 'need-switch' }
-  | { type: 'end'; outcome: 'won' | 'lost' | 'ran'; money?: number };
+  | { type: 'end'; outcome: 'won' | 'lost' | 'ran'; money?: number }
+  /**
+   * The first battle's tutorial (BATTLE_TYPE_FIRST_BATTLE): Oak's comment the
+   * first time the foe takes damage, and the first time the player lowers one
+   * of its stats.
+   */
+  | { type: 'oak'; line: 'damage' | 'stats' };
 
 /**
  * The move effects handled so far, from data/battle_scripts_1.s. A damaging
@@ -129,6 +135,13 @@ export interface BattleSetup {
   foe: { wild: Mon } | { trainer: string };
   /** [0, 1), the battle's own stream */
   rng: () => number;
+  /**
+   * The first battle (trainerbattle_earlyrival with RIVAL_BATTLE_TUTORIAL):
+   * the player's damaging moves can't miss until the foe first takes damage,
+   * their stat moves can't miss until a foe's stat first falls, and there are
+   * no critical hits until that first damage (Cmd_accuracycheck, Cmd_critcalc).
+   */
+  firstBattle?: boolean;
 }
 
 export class Battle {
@@ -145,6 +158,9 @@ export class Battle {
   private readonly playerId: number;
   private readonly rng: () => number;
   private runTries = 0;
+  readonly firstBattle: boolean;
+  /** the tutorial's flags: the foe has taken damage; a foe's stat has fallen */
+  private tutorial = { damaged: false, lowered: false };
   /** player party slots that have faced the foe that's out */
   private fought = new Set<number>();
 
@@ -152,6 +168,7 @@ export class Battle {
     this.pokemon = setup.pokemon;
     this.data = setup.battle;
     this.rng = setup.rng;
+    this.firstBattle = !!setup.firstBattle;
     this.playerId = setup.playerId;
     if ('wild' in setup.foe) {
       this.trainer = null;
@@ -349,8 +366,10 @@ export class Battle {
   private damagingMove(side: Side, move: MoveData, struggle: boolean, ev: BattleEvent[]) {
     const foe = other(side), target = this.mon(foe), user = this.mon(side);
     const att = this.fighter(side), def = this.fighter(foe);
-    if (!hits(hitChance(move, att, def, this.data), this.r16())) { ev.push({ type: 'miss', side }); return; }
-    const crit = isCrit(critStage(move, this.active[side].focusEnergy), def, this.r16());
+    const sure = this.firstBattle && side === 'player' && !this.tutorial.damaged;
+    if (!sure && !hits(hitChance(move, att, def, this.data), this.r16())) { ev.push({ type: 'miss', side }); return; }
+    // The crit roll happens either way; the first battle has none before the first damage.
+    const crit = isCrit(critStage(move, this.active[side].focusEnergy), def, this.r16()) && !(this.firstBattle && !this.tutorial.damaged);
     const multipliers = struggle ? [] : def.ability === 'ABILITY_LEVITATE' && move.type === 'TYPE_GROUND' ? [0] : typeMultipliers(this.data, move.type, def.types);
     const eff = struggle ? 'normal' : effectiveness(multipliers);
     if (eff === 'none') { ev.push({ type: 'no-effect', side: foe }); return; }
@@ -358,6 +377,7 @@ export class Battle {
     const dealt = Math.min(target.hp, damage);
     target.hp -= dealt;
     ev.push({ type: 'damage', side: foe, amount: dealt, hp: target.hp, crit, effectiveness: eff });
+    if (this.firstBattle && foe === 'foe' && !this.tutorial.damaged) { this.tutorial.damaged = true; ev.push({ type: 'oak', line: 'damage' }); }
 
     // What comes with the hit.
     if (move.effect === 'EFFECT_ABSORB') this.heal(side, Math.max(1, Math.floor(dealt / 2)), ev);
@@ -386,7 +406,8 @@ export class Battle {
     const stat = statEffect(move.effect);
     const targetsFoe = stat ? stat.change < 0 : !['EFFECT_FOCUS_ENERGY'].includes(move.effect);
     if (!stat && !EFFECTS.has(move.effect)) { ev.push({ type: 'fail' }); return; }
-    if (targetsFoe && !hits(hitChance(move, att, def, this.data), this.r16())) { ev.push({ type: 'miss', side }); return; }
+    const sure = this.firstBattle && side === 'player' && !this.tutorial.lowered;
+    if (targetsFoe && !sure && !hits(hitChance(move, att, def, this.data), this.r16())) { ev.push({ type: 'miss', side }); return; }
     if (stat) { this.changeStat(stat.change > 0 ? side : foe, stat.stat, stat.change, ev, false, side); return; }
     switch (move.effect) {
       case 'EFFECT_SLEEP': this.inflict(foe, 'sleep', ev, false); break;
@@ -424,6 +445,7 @@ export class Battle {
     if (next === b.stages[stat]) { if (!secondary) ev.push({ type: 'stat-limit', side, stat, up: change > 0 }); return; }
     ev.push({ type: 'stat', side, stat, change: next - b.stages[stat] });
     b.stages[stat] = next;
+    if (this.firstBattle && side === 'foe' && by === 'player' && change < 0 && !this.tutorial.lowered) { this.tutorial.lowered = true; ev.push({ type: 'oak', line: 'stats' }); }
   }
 
   /** SetMoveEffect for a lasting status: type and ability immunities, and one status at a time. */

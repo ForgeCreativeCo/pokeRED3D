@@ -25,6 +25,12 @@ export interface BattleStart {
   rng: () => number;
   /** what the trainer says on losing (from the trainerbattle command), after "Player defeated …" */
   loseText?: string;
+  /** what the trainer says on winning (trainerbattle_earlyrival's victory text) */
+  winText?: string;
+  /** the first battle, with Oak's tutorial (RIVAL_BATTLE_TUTORIAL) */
+  firstBattle?: boolean;
+  /** losing doesn't white out: the party is healed and the story goes on (RIVAL_BATTLE_HEAL_AFTER) */
+  healAfter?: boolean;
 }
 
 export type BattleOutcome = 'won' | 'lost' | 'ran';
@@ -83,6 +89,7 @@ export class BattleScreen {
     this.start = start;
     const battle = (this.battle = new Battle({
       pokemon: this.pokemon, battle: this.data, party: this.story.party, playerId: this.story.trainerId, foe: start.foe, rng: start.rng,
+      firstBattle: start.firstBattle,
     }));
     const trainer = battle.trainer ? this.data.trainers[battle.trainer] : null;
     const before = this.music.current;
@@ -97,6 +104,8 @@ export class BattleScreen {
     // The opening: the trainer (or wild Pokémon) first, then yours.
     if (trainer) await this.say(this.line('sText_Trainer1WantsToBattle', 'foe'));
     for (const e of battle.start()) await this.play(e);
+    // "OAK: Oh, for Pete's sake…" once both Pokémon are out (PrintOakText_ForPetesSake).
+    if (start.firstBattle) await this.say(this.line('gText_ForPetesSake', 'player'));
 
     while (battle.phase !== 'over') {
       if (battle.phase === 'switch') { await this.forcedSwitch(); continue; }
@@ -388,8 +397,9 @@ export class BattleScreen {
         break;
       }
       case 'learn-prompt': await this.learnPrompt(e.party, e.move); break;
+      case 'oak': await this.say(e.line === 'damage' ? T.gText_InflictingDamageIsKey : T.gText_LoweringStats); break;
       case 'run':
-        if (e.reason === 'trainer') await this.say(T.sText_NoRunningFromTrainers);
+        if (e.reason === 'trainer') await this.say(this.start?.firstBattle ? T.gText_OakNoRunningFromATrainer : T.sText_NoRunningFromTrainers);
         else await this.say(e.ok ? T.sText_GotAwaySafely : T.sText_CantEscape);
         break;
       case 'need-switch': break;
@@ -409,6 +419,19 @@ export class BattleScreen {
         this.story.money = Math.min(999999, this.story.money + money);
         await this.say(this.line('sText_PlayerGotMoney', 'player', { BUFF1: money }));
       }
+      if (this.start?.firstBattle) await this.say(this.data.text.gText_WinEarnsPrizeMoney);
+    }
+    if (outcome === 'lost' && b.trainer && this.start?.healAfter) {
+      // BattleScript_RivalBattleLost: the rival calls their Pokémon back, steps in and gloats; no whiteout.
+      if (b.mon('foe').hp > 0) {
+        await this.say(this.line('sText_Trainer1RecallPkmn1', 'foe'));
+        this.q('.bmon.foe').classList.add('out');
+        this.q('.hpbox.foe').hidden = true;
+      }
+      this.q('.btrainer.foe').classList.remove('gone');
+      if (this.start.winText) await this.say(this.start.winText + '\\p');
+      if (this.start.firstBattle) await this.say(this.line('gText_HowDissapointing', 'player'));
+      return;
     }
     if (outcome === 'lost') {
       await this.say(this.line(b.trainer ? 'sText_PlayerWhiteoutAgainstTrainer' : 'sText_PlayerWhiteout', 'player'));

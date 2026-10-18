@@ -55,6 +55,7 @@ export class Game implements ScriptHost {
   readonly items: Record<string, ItemData>;
   readonly startMenu: StartMenu;
   readonly battleScreen: BattleScreen;
+  readonly battleData: GameData['battle'];
   /** shown at start-up when there's a save: CONTINUE or NEW GAME */
   readonly title: TitleScreen | null;
   /** a save from another game is in storage: the first save asks before overwriting it */
@@ -118,6 +119,7 @@ export class Game implements ScriptHost {
     this.title = saved ? new TitleScreen(this.input, doc, saved, data.pokemon) : null;
     this.title?.show();
     this.textbox = new TextBox(this.clock, this.input, this.story, doc);
+    this.battleData = data.battle;
     this.battleScreen = new BattleScreen(this.clock, this.input, this.story, doc, data.pokemon, data.battle, this.music, data.scripts.text);
     this.emote = new Emote(this.clock, doc);
     this.vm = new ScriptVM(data.scripts, this);
@@ -162,10 +164,20 @@ export class Game implements ScriptHost {
    * A battle where the player stands: the background comes from the tile and
    * the map (BattleSetup_GetTerrainId). Resolves when it's over.
    */
-  battle(foe: { wild: Mon } | { trainer: string }, loseText?: string): Promise<BattleOutcome> {
+  battle(foe: { wild: Mon } | { trainer: string }, opts: { loseText?: string; winText?: string; firstBattle?: boolean; healAfter?: boolean } = {}): Promise<BattleOutcome> {
     const c = this.world.locate(this.player.x, this.player.y);
     const terrain = battleTerrain(this.world.behaviorAt(this.player.x, this.player.y) ?? 'MB_NORMAL', c?.m.data.mapType ?? 'MAP_TYPE_ROUTE', c?.m.data.battleScene);
-    return this.battleScreen.run({ foe, terrain, rng: battleRandom, loseText: loseText && this.texts[loseText] });
+    const text = (label?: string) => (label ? this.texts[label] : undefined);
+    return this.battleScreen.run({ foe, terrain, rng: battleRandom, loseText: text(opts.loseText), winText: text(opts.winText), firstBattle: opts.firstBattle, healAfter: opts.healAfter });
+  }
+
+  /** HealPlayerParty: full HP and PP, no status. */
+  healParty() {
+    for (const m of this.story.party) {
+      m.hp = m.stats.hp;
+      m.status = undefined;
+      for (const mv of m.moves) mv.pp = this.pokemon.moves[mv.move]?.pp ?? mv.pp;
+    }
   }
 
   /** Open the start menu, as START does. */
