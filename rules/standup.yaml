@@ -16,6 +16,8 @@ buildings:
   roof_rise: 0.6             # extra height at the back edge of the roof
   min_wall_rows: 1           # columns with no wall rows still get this much wall
   sides: true                # close off the left / right ends
+  indoor_full_walls: true    # indoors (no roofs), each column stands all its rows up as wall
+  indoor_wall_furniture: [furniture]  # ...along with these classes right below it
 
 # Objects: everything else that stands up. Cells of these classes are grouped
 # into vertical stacks per column (including any overhang cell on top), cut

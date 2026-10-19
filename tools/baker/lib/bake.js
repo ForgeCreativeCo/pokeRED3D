@@ -120,6 +120,8 @@ export function bakeMap(name, rules, lookup) {
   }
 
   const wallClasses = new Set(['wall', 'door']);
+  // Rooms have no roofs: indoors, each column of the back wall stands its whole stack up.
+  const fullWalls = S.buildings.indoor_full_walls && map.map_type === 'MAP_TYPE_INDOOR';
   for (const comp of buildings) {
     const columns = new Map();
     for (const c of comp) {
@@ -128,6 +130,14 @@ export function bakeMap(name, rules, lookup) {
     }
     const cols = [...columns.entries()].sort((a, b) => a[0] - b[0]).map(([x, list]) => {
       list.sort((a, b) => a.y - b.y);
+      // Furniture against a room's back wall (counters, shelves, the TV) is painted
+      // as the wall's lower rows: stand it up with the wall so the wall top stays level.
+      if (fullWalls) {
+        for (let n = cell(x, list[list.length - 1].y + 1); n && !n.walkable && !seen.has(n) && S.buildings.indoor_wall_furniture?.includes(n.e.class); n = cell(x, n.y + 1)) {
+          seen.add(n);
+          list.push(n);
+        }
+      }
       let wallRows = 0;
       for (let i = list.length - 1; i >= 0 && wallClasses.has(list[i].e.class) && !list[i].walkable; i--) wallRows++;
       return { x, list, wallRows };
@@ -143,18 +153,19 @@ export function bakeMap(name, rules, lookup) {
       const { x, list } = col;
       const zFront = list[list.length - 1].y + 1;
       const zBack = list[0].y;
-      const nWall = Math.max(col.wallRows, S.buildings.min_wall_rows);
+      const nWall = fullWalls ? list.length : Math.max(col.wallRows, S.buildings.min_wall_rows);
+      const colH = fullWalls ? nWall * S.buildings.wall_height_per_row : wallH;
       const wallCells = list.slice(list.length - nWall);
       const roofCells = list.slice(0, list.length - nWall);
 
       const wallUv = packer.add(stack(wallCells.map((c) => renderMetatile(pair, c.metatile))));
-      quad('wall', [[x, base, zFront], [x + 1, base, zFront], [x + 1, base + wallH, zFront], [x, base + wallH, zFront]], wallUv);
+      quad('wall', [[x, base, zFront], [x + 1, base, zFront], [x + 1, base + colH, zFront], [x, base + colH, zFront]], wallUv);
 
       if (roofCells.length) {
         const roofUv = packer.add(stack(roofCells.map((c) => (c.walkable ? objectLayer(c) : renderMetatile(pair, c.metatile)))));
         quad('roof', [[x, base + wallH, zFront], [x + 1, base + wallH, zFront], [x + 1, base + wallH + rise, zBack], [x, base + wallH + rise, zBack]], roofUv, list[0].walkable);
       }
-      col.zFront = zFront; col.zBack = zBack; col.wallUv = wallUv;
+      col.zFront = zFront; col.zBack = zBack; col.wallUv = wallUv; col.h = colH; col.rise = roofCells.length ? rise : 0;
     }
     if (S.buildings.sides) {
       for (const [col, sx, edge] of [[cols[0], cols[0].x, 0], [cols[cols.length - 1], cols[cols.length - 1].x + 1, 1]]) {
@@ -165,7 +176,8 @@ export function bakeMap(name, rules, lookup) {
         // A strip from just inside the wall (past its outline), stretched over the side.
         const [u0, v0, u1, v1] = col.wallUv;
         const uv = edge ? [u1 - 6, v0, u1 - 4, v1] : [u0 + 4, v0, u0 + 6, v1];
-        quad('side', [[sx, base, solidBack], [sx, base, col.zFront], [sx, base + wallH, col.zFront], [sx, base + wallH + rise * t, solidBack]], uv);
+        // With no roof (a room's back wall) the top is level: no slope to follow.
+        quad('side', [[sx, base, solidBack], [sx, base, col.zFront], [sx, base + col.h, col.zFront], [sx, base + col.h + col.rise * t, solidBack]], uv);
       }
     }
     buildings[buildings.indexOf(comp)] = { cells: comp.length, front, wallHeight: wallH, x0: cols[0].x, x1: cols[cols.length - 1].x + 1 };
