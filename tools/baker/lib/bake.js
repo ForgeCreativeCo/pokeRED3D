@@ -143,6 +143,14 @@ export function bakeMap(name, rules, lookup) {
       for (let i = list.length - 1; i >= 0 && wallClasses.has(list[i].e.class) && !list[i].walkable; i--) wallRows++;
       return { x, list, wallRows };
     });
+    // A room's back wall stands only as deep as most of its columns. Rows that
+    // reach further into the room (the foot of a staircase, the railing round
+    // a stairwell going down) are drawn on the floor: standing up, they'd tower.
+    if (fullWalls) {
+      const top = Math.min(...cols.map((c) => c.list[0].y));
+      const depth = mode(cols.map((c) => c.list.length));
+      for (const col of cols) while (col.list.length > 1 && col.list[col.list.length - 1].y >= top + depth) seen.delete(col.list.pop());
+    }
     // One wall height for the whole building keeps the roof line straight.
     const rowsMode = mode(cols.map((c) => c.wallRows).filter((n) => n > 0)) ?? S.buildings.min_wall_rows;
     const wallH = Math.max(rowsMode, S.buildings.min_wall_rows) * perRow;
