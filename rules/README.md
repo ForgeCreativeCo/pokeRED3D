@@ -78,9 +78,9 @@ disagree: there are no invisible walls, and roofs and tree tops hide the
 player in the walk-behind row just like on the GBA.
 
 - **Buildings** are connected wall/door/roof cells. Per column, the bottom run
-  of wall rows stands up as the front face. The rest becomes a roof sloping
-  back over the footprint, including the walk-behind row. Side walls close the
-  ends.
+  of wall rows stands up as the front face, 1.5 tiles a row outdoors so a door
+  is a little taller than Red. The rest becomes a roof sloping back over the
+  footprint, including the walk-behind row. Side walls close the ends.
 - **Objects** (trees, props, signs, ledges, furniture) are per-column stacks,
   cut into chunks of `max_rows` from the bottom. Each chunk stands (optionally
   leaning) on the front edge of its bottom cell.
@@ -98,7 +98,7 @@ player in the walk-behind row just like on the GBA.
 {
   "format": { "name": "pokered3d-map", "version": 1 },
   "name": "PalletTown", "width": 24, "height": 20,
-  "camera": { "preset": "default", "pitch": 55, "fov": 24, "view": 11 },
+  "camera": { "preset": "default", "pitch": 25, "fov": 50, "view": 8 },
   "grid": {            // row-major, width * height
     "walkable": [0, 1, ...], "height": [...], "elevation": [...],
     "behavior": ["MB_NORMAL", ...], "encounter": [0, 1, ...], "class": ["ground", ...]  // encounter: 1 land, 2 water
@@ -159,13 +159,14 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 | Interiors and warps | **done** | Doors, exit mats, stairs; void, low blocks, flat floors |
 | Map connections | **done** | Maps placed by their connection offsets; walk across edges |
 | Prop grouping | partly | Buildings are grouped; objects are per-column chunks so far |
-| Billboards | **done** | Real overworld sprites from the decomp, yaw-only, screen-size matched, shadows, hidden flags (`billboards.yaml`) |
+| Billboards | **done** | Real overworld sprites from the decomp, yaw-only, true size, shadows, hidden flags (`billboards.yaml`) |
 | Materials and colour | later | Per-class shading, palette grading, water shader |
 | Per-map camera | **started** | Presets in `camera.yaml`; `rules/maps/<Map>.yaml` can pick one |
 
 ## Interiors
 
 - **Void** (the black around rooms) is detected as blocked and at least 90% black. It draws nothing, and it ends wall columns like the map edge. Void in front of furniture counts as floor, since it's just the room's front edge.
+- **Back walls** stand at full height (1 tile a row), with the furniture painted against them, and only as deep as most of their columns: the foot of a staircase or a stairwell lies flat. See [docs/view-style.md](../docs/view-style.md).
 - **Freestanding props** (floor in front and behind, at most 3 rows) aren't walls. Indoors they become **low blocks** (`standup.yaml` `blocks`): art on a raised top with a short front face. Shelves, PCs and TVs (`furniture`, from behaviors) still stand.
 - **Interiors are flat** (`height.yaml` `flat_indoors`): indoor elevation only sorts sprites.
 - **Visibility** at the start comes from the decomp's new-game flag script, so Oak is hidden but Blue and the starters wait in the lab.

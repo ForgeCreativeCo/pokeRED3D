@@ -112,11 +112,14 @@ The rules, the baked format and every decision behind them are documented in
 | **Classify** | Every metatile gets a render class (ground, wall, roof, tree, prop, water, void, …) from placement statistics over every map, its behavior, animations, and hand overrides | `classifier.yaml`, `behaviors.yaml`, `animations.yaml`, `tilesets/*.yaml` |
 | **Height** | Elevation becomes world height (interiors are flat) | `height.yaml` |
 | **Stand-up** | Buildings stand as walls with sloped roofs, objects stand as cutout quads, indoor furniture becomes low blocks, all over the exact cells the collision grid blocks | `standup.yaml` |
-| **Billboards** | Player and NPC sprites face the camera and are sized to match FireRed on screen | `billboards.yaml` |
-| **Camera** | Outdoor and interior camera presets | `camera.yaml` |
+| **Billboards** | Player and NPC sprites face the camera at true size (1 tile per 16 px) | `billboards.yaml` |
+| **Camera** | Outdoor and interior camera presets: close and low behind the player | `camera.yaml` |
 | **Music** | Each song's MIDI, voicegroup and samples, resolved to the voices FireRed would play | `tools/baker/lib/music.js` |
 | **Scripts** | Event scripts and text reachable from people, signs, triggers and map scripts | `tools/baker/lib/scripts.js` |
 | **Battle data** | Type chart, wild Pokémon, trainers and their parties, trainer pictures, battle backgrounds | `tools/baker/lib/battle.js` |
+
+The look these rules produce, and what every new map has to keep, is written
+up in [docs/view-style.md](docs/view-style.md).
 
 The game itself is TypeScript and three.js in `src/`, built with Vite. It
 loads the baked files (`build/data/*.json` and each map's `map.json` and
