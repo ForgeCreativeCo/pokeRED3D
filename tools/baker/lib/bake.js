@@ -122,6 +122,7 @@ export function bakeMap(name, rules, lookup) {
   const wallClasses = new Set(['wall', 'door']);
   // Rooms have no roofs: indoors, each column of the back wall stands its whole stack up.
   const fullWalls = S.buildings.indoor_full_walls && map.map_type === 'MAP_TYPE_INDOOR';
+  const perRow = (map.map_type === 'MAP_TYPE_INDOOR' && S.buildings.indoor_wall_height_per_row) || S.buildings.wall_height_per_row;
   for (const comp of buildings) {
     const columns = new Map();
     for (const c of comp) {
@@ -144,7 +145,7 @@ export function bakeMap(name, rules, lookup) {
     });
     // One wall height for the whole building keeps the roof line straight.
     const rowsMode = mode(cols.map((c) => c.wallRows).filter((n) => n > 0)) ?? S.buildings.min_wall_rows;
-    const wallH = Math.max(rowsMode, S.buildings.min_wall_rows) * S.buildings.wall_height_per_row;
+    const wallH = Math.max(rowsMode, S.buildings.min_wall_rows) * perRow;
     const rise = S.buildings.roof_rise;
     const front = Math.max(...comp.map((c) => c.y)) + 1;
     const base = cell(cols[0].x, front)?.h ?? Math.min(...comp.map((c) => c.h));
@@ -154,7 +155,7 @@ export function bakeMap(name, rules, lookup) {
       const zFront = list[list.length - 1].y + 1;
       const zBack = list[0].y;
       const nWall = fullWalls ? list.length : Math.max(col.wallRows, S.buildings.min_wall_rows);
-      const colH = fullWalls ? nWall * S.buildings.wall_height_per_row : wallH;
+      const colH = fullWalls ? nWall * perRow : wallH;
       const wallCells = list.slice(list.length - nWall);
       const roofCells = list.slice(0, list.length - nWall);
 

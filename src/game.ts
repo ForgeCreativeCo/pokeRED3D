@@ -487,6 +487,7 @@ export class Game implements ScriptHost {
     const camPos = this.rig.cam.position;
     for (const a of this.areaActors()) this.views.place(a, actorPos(a, this.heightAt), camPos, this.rig.settings.pitch);
     this.views.syncVisibility(this.actors, player, world.area);
+    this.views.fadeSilhouettes(player);
     this.doors.update(world, this.views.position(player));
     this.trackCell();
     if (this.rig.orbit.enabled) this.rig.orbit.update();

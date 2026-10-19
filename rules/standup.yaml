@@ -12,8 +12,11 @@
 # the rest of the footprint.
 buildings:
   classes: [wall, door, roof]
-  wall_height_per_row: 1.0   # tiles of wall height per wall row in the art
-  roof_rise: 0.6             # extra height at the back edge of the roof
+  # FireRed draws a door (one wall row, ~15 px) shorter than Red (~19 px).
+  # 1.5 tiles a row makes a door about 1.2x Red's height, as a real one is.
+  wall_height_per_row: 1.5   # tiles of wall height per wall row in the art
+  indoor_wall_height_per_row: 1.0  # rooms: counters and shelves painted on the wall stay below Red's head
+  roof_rise: 0.9             # extra height at the back edge of the roof
   min_wall_rows: 1           # columns with no wall rows still get this much wall
   sides: true                # close off the left / right ends
   indoor_full_walls: true    # indoors (no roofs), each column stands all its rows up as wall

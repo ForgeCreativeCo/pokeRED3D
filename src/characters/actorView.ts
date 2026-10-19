@@ -6,6 +6,10 @@ import type { Billboards } from '../data/types';
 import type { LoadedMap } from '../data/load';
 import { actorFrame, type Actor } from './actor';
 
+/** silhouettes of other people: fully shown within NEAR tiles of the player, gone past FAR */
+const NEAR = 4, FAR = 7;
+const GHOST_OPACITY = 0.55;
+
 interface View {
   root: THREE.Group;
   /** leans the sprite back; lifted during a ledge hop (the shadow stays down) */
@@ -53,13 +57,25 @@ export class ActorViews {
     const v = this.views.get(a)!;
     if (!v.sprite) return;
     const mat = new THREE.MeshBasicMaterial({
-      color: '#1d2a4a', alphaTest: 0.5, transparent: true, opacity: 0.55,
+      color: '#1d2a4a', alphaTest: 0.5, transparent: true, opacity: GHOST_OPACITY,
       depthWrite: false, depthFunc: THREE.GreaterDepth,
     });
     // Shares the sprite's geometry (so its frames) and sits at its transform.
     v.ghost = new THREE.Mesh(v.sprite.geometry, mat);
     v.ghost.renderOrder = 10;
     v.sprite.add(v.ghost);
+  }
+
+  /** Fade other people's silhouettes by distance, so far-off ones don't show through everything. */
+  fadeSilhouettes(player: Actor) {
+    const at = this.views.get(player)!.root.position;
+    for (const [a, v] of this.views) {
+      if (!v.ghost || a === player) continue;
+      const p = v.root.position;
+      const k = Math.min(1, Math.max(0, (FAR - Math.hypot(p.x - at.x, p.z - at.z)) / (FAR - NEAR)));
+      v.ghost.visible = k > 0;
+      v.ghost.material.opacity = GHOST_OPACITY * k;
+    }
   }
 
   /** Where the actor's feet are drawn. */
