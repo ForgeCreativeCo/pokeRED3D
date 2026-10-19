@@ -32,6 +32,7 @@ import { WildEncounters, createWildMon } from './battle/wild';
 import { whiteOutLoss } from './battle/rules';
 import { abilityOf } from './pokemon/mon';
 import type { Mon } from './pokemon/mon';
+import { DoorGhosts } from './render/doorGhosts';
 
 /** In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows. */
 const GBA_ROWS = 10;
@@ -41,6 +42,7 @@ export class Game implements ScriptHost {
   readonly input = new Input();
   readonly world: World;
   readonly stage: Stage;
+  private readonly doors: DoorGhosts;
   readonly views: ActorViews;
   readonly home: LoadedMap;
   readonly player: Actor;
@@ -82,6 +84,7 @@ export class Game implements ScriptHost {
     this.canvas = $('stage') as HTMLCanvasElement;
     this.world = new World(data.maps);
     this.stage = new Stage(this.canvas, data.maps);
+    this.doors = new DoorGhosts(this.stage.scene, this.stage.meshes);
     this.bb = data.maps[0].data.billboards;
     this.views = new ActorViews(this.stage.scene, this.bb, (m) => this.stage.spriteMaterial(m));
 
@@ -95,8 +98,9 @@ export class Game implements ScriptHost {
     this.world.area = home.area;
     const spawn = (a: Actor) => { this.views.add(a); return a; };
     this.player = spawn(makeActor({ gfx: this.bb.player, x: start.x, y: start.y, facing: START?.facing ?? 'down' }, home));
-    this.views.silhouette(this.player);
     this.npcs = data.maps.flatMap((m) => m.data.objects.map((o) => spawn(makeActor({ ...o, x: o.x + m.ox, y: o.y + m.oy }, m))));
+    // With the camera low, buildings hide people: show them through as silhouettes.
+    for (const a of [this.player, ...this.npcs]) this.views.silhouette(a);
     this.actors = [this.player, ...this.npcs];
 
     this.gba = new GbaView($('gba') as HTMLCanvasElement);
@@ -483,6 +487,7 @@ export class Game implements ScriptHost {
     const camPos = this.rig.cam.position;
     for (const a of this.areaActors()) this.views.place(a, actorPos(a, this.heightAt), camPos, this.rig.settings.pitch);
     this.views.syncVisibility(this.actors, player, world.area);
+    this.doors.update(world, this.views.position(player));
     this.trackCell();
     if (this.rig.orbit.enabled) this.rig.orbit.update();
     else this.rig.follow(this.views.position(player), this.comparing ? GBA_ROWS : undefined);
