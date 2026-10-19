@@ -9,11 +9,11 @@ player: OBJ_EVENT_GFX_RED_NORMAL
 # Degrees a sprite tips back from vertical, toward the camera. Some lean keeps
 # the art from looking squashed under a tilted camera; too much and a sprite
 # standing against a wall pokes through it.
-lean: 20
+lean: 5
 
 # Scale sprites so they appear the same size on screen as in FireRed, relative
 # to the ground tiles, whatever the camera pitch.
-match_screen_size: true
+match_screen_size: false
 
 # How far in front of the cell centre the sprite's feet stand (tiles), so the
 # leaning sprite stays clear of a wall in the cell behind.

@@ -95,6 +95,7 @@ export class Game implements ScriptHost {
     this.world.area = home.area;
     const spawn = (a: Actor) => { this.views.add(a); return a; };
     this.player = spawn(makeActor({ gfx: this.bb.player, x: start.x, y: start.y, facing: START?.facing ?? 'down' }, home));
+    this.views.silhouette(this.player);
     this.npcs = data.maps.flatMap((m) => m.data.objects.map((o) => spawn(makeActor({ ...o, x: o.x + m.ox, y: o.y + m.oy }, m))));
     this.actors = [this.player, ...this.npcs];
 

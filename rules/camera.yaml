@@ -6,5 +6,6 @@
 #   view      tiles of map visible vertically (overrides distance when set)
 
 cameras:
-  default:  { pitch: 55, fov: 24, view: 11 }
+  # Close chase camera, low behind the player (was pitch 55, fov 24, view 11).
+  default:  { pitch: 25, fov: 50, view: 8 }
   interior: { pitch: 62, fov: 22, view: 10 }

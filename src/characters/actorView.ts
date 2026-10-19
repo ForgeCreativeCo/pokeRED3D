@@ -11,6 +11,8 @@ interface View {
   /** leans the sprite back; lifted during a ledge hop (the shadow stays down) */
   tilt: THREE.Group;
   sprite: THREE.Mesh<THREE.PlaneGeometry> | null;
+  /** a faint copy drawn only where something stands in front of the sprite */
+  ghost?: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
 }
 
 export class ActorViews {
@@ -46,6 +48,20 @@ export class ActorViews {
     this.views.set(a, { root, tilt, sprite });
   }
 
+  /** Show the actor through whatever hides it (a building between it and the low camera) as a faint silhouette. */
+  silhouette(a: Actor) {
+    const v = this.views.get(a)!;
+    if (!v.sprite) return;
+    const mat = new THREE.MeshBasicMaterial({
+      color: '#1d2a4a', alphaTest: 0.5, transparent: true, opacity: 0.55,
+      depthWrite: false, depthFunc: THREE.GreaterDepth,
+    });
+    // Shares the sprite's geometry (so its frames) and sits at its transform.
+    v.ghost = new THREE.Mesh(v.sprite.geometry, mat);
+    v.ghost.renderOrder = 10;
+    v.sprite.add(v.ghost);
+  }
+
   /** Where the actor's feet are drawn. */
   position(a: Actor): THREE.Vector3 {
     return this.views.get(a)!.root.position;
@@ -70,6 +86,7 @@ export class ActorViews {
     const [sx, sy] = this.spriteScale(a, pitchDeg);
     v.sprite.scale.set(sx, sy, 1);
     this.setFrame(a, v.sprite, actorFrame(a), a.facing === 'right');
+    if (v.ghost) v.ghost.material.map = (v.sprite.material as THREE.MeshBasicMaterial).map;
   }
 
   /** Size so a sprite covers the same screen area as in FireRed, relative to ground tiles. */
