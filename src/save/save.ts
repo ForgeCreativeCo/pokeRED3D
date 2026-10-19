@@ -32,6 +32,8 @@ export interface SaveFile {
     dex: { seen: string[]; caught: string[] };
     playTime: number;
     options: Options;
+    /** the last heal point (older saves have none: Pallet Town) */
+    respawn?: string;
   };
 }
 
@@ -54,6 +56,7 @@ export function makeSave(story: Story, location: SaveFile['location'], now = Dat
       dex: { seen: [...story.dex.seen].sort(), caught: [...story.dex.caught].sort() },
       playTime: Math.floor(story.playTime),
       options: { ...story.options },
+      respawn: story.respawn,
     },
   };
 }
@@ -76,6 +79,7 @@ export function applySave(story: Story, save: SaveFile) {
   for (const sp of s.dex.caught) story.dex.caught.add(sp);
   story.playTime = s.playTime;
   story.options = { ...defaultOptions(), ...s.options };
+  story.respawn = s.respawn ?? 'HEAL_LOCATION_PALLET_TOWN';
 }
 
 /** The save in storage, if there's a readable one of this version. */

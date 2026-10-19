@@ -22,7 +22,7 @@ import { Panel, pretty } from './ui/panel';
 import { MonPic } from './ui/monPic';
 import { PartyMenu } from './ui/party';
 import { battleRandom, encounterRandom, monRandom } from './core/random';
-import type { ItemData, PokemonFile } from './data/types';
+import type { HealLocation, ItemData, PokemonFile } from './data/types';
 import { StartMenu } from './ui/startMenu';
 import { BagMenu, OptionsMenu, Pokedex, TitleScreen, TrainerCard } from './ui/screens';
 import { applySave, makeSave, readSave, writeSave, type SaveFile } from './save/save';
@@ -67,6 +67,8 @@ export class Game implements ScriptHost {
   /** a save from another game is in storage: the first save asks before overwriting it */
   private otherSave = false;
   private texts: Record<string, string>;
+  /** heal points in the bake, for whiting out */
+  private readonly healLocations: HealLocation[];
   readonly rig: CameraRig;
   readonly panel: Panel;
   /** a warp's fade is running */
@@ -109,6 +111,7 @@ export class Game implements ScriptHost {
     const trainerId = ((Math.floor(monRandom() * 0x10000) << 16) | Math.floor(monRandom() * 0x10000)) >>> 0;
     this.items = data.items.items;
     this.texts = data.scripts.text;
+    this.healLocations = data.world.healLocations ?? [];
     this.story = new Story(data.scripts.startFlags, trainerId, data.items.items, data.items.startMoney);
     this.pokemon = data.pokemon;
     this.monPic = new MonPic(data.pokemon, doc);
@@ -202,8 +205,8 @@ export class Game implements ScriptHost {
 
   /**
    * DoWhiteOut: lose money (ComputeWhiteOutMoneyLoss), heal, and wake up at the
-   * last heal point. Only Pallet Town's so far: Red's house, in front of Mom
-   * (SetWhiteoutRespawnWarpAndHealerNpc puts you at 8,5), who says her piece.
+   * last heal point setrespawn marked (SetWhiteoutRespawnWarpAndHealerNpc). In
+   * Red's house Mom says her piece; in a Pokémon Center the nurse heals the party.
    */
   async whiteOut() {
     const { story } = this;
@@ -211,12 +214,15 @@ export class Game implements ScriptHost {
     story.money -= whiteOutLoss(Math.max(...story.party.map((m) => m.level)), badges, story.money);
     this.healParty();
     this.wild.reset();
-    const home = this.world.mapByName('PalletTown_PlayersHouse_1F');
-    if (!home) return;
-    await this.warpTo(home, 8, 5);
+    const heal = this.healLocations.find((h) => h.id === story.respawn) ?? this.healLocations.find((h) => h.home);
+    const room = heal && this.world.mapByName(heal.map);
+    if (!heal || !room) return;
+    await this.warpTo(room, heal.x, heal.y);
     this.player.facing = 'up';
-    if (this.texts.gText_PlayerScurriedBackHome) { await this.textbox.say(this.texts.gText_PlayerScurriedBackHome); this.textbox.close(); }
-    if (this.vm.has('EventScript_AfterWhiteOutMomHeal')) this.vm.run('EventScript_AfterWhiteOutMomHeal', null);
+    const line = this.texts[heal.home ? 'gText_PlayerScurriedBackHome' : 'gText_PlayerScurriedToCenter'];
+    if (line) { await this.textbox.say(line); this.textbox.close(); }
+    const after = heal.home ? 'EventScript_AfterWhiteOutMomHeal' : 'EventScript_AfterWhiteOutHeal';
+    if (this.vm.has(after)) this.vm.run(after, this.areaActors().find((a) => a.id === heal.healer) ?? null);
   }
 
   /** HealPlayerParty: full HP and PP, no status. */

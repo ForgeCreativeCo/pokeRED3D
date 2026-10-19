@@ -166,7 +166,8 @@ Alongside the maps, `build/data/` holds what the whole bake shares:
 ## Interiors
 
 - **Void** (the black around rooms) is detected as blocked and at least 90% black. It draws nothing, and it ends wall columns like the map edge. Void in front of furniture counts as floor, since it's just the room's front edge.
-- **Back walls** stand at full height (1 tile a row), with the furniture painted against them, and only as deep as most of their columns: the foot of a staircase or a stairwell lies flat. See [docs/view-style.md](../docs/view-style.md).
+- **Back walls** are every blocked cell from the top of a column down to the floor, whatever its tile class (`indoor_back_wall`). They stand at full height (1 tile a row), with the furniture painted against them, and only as deep as most of their columns: the foot of a staircase or a stairwell lies flat. See [docs/view-style.md](../docs/view-style.md).
+- **Counters** (`MB_COUNTER`) are their own class and become low blocks, so the nurse or clerk behind one shows above it.
 - **Freestanding props** (floor in front and behind, at most 3 rows) aren't walls. Indoors they become **low blocks** (`standup.yaml` `blocks`): art on a raised top with a short front face. Shelves, PCs and TVs (`furniture`, from behaviors) still stand.
 - **Interiors are flat** (`height.yaml` `flat_indoors`): indoor elevation only sorts sprites.
 - **Visibility** at the start comes from the decomp's new-game flag script, so Oak is hidden but Blue and the starters wait in the lab.

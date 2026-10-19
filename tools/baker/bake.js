@@ -97,6 +97,16 @@ const ng = newGame().start;
 const start = ng && baked.has(ng.map) ? { ...ng, facing: 'down' } : null;
 console.log(`\nWorld: ${areas} area(s); start ${start ? `${start.map} ${start.x},${start.y}` : `outside ${names[0]}'s first door`}`);
 
+// Heal points (src/data/heal_locations.json) whose room is in the bake: where
+// whiting out wakes you, and who heals you there. SetWhiteoutRespawnWarpAndHealerNpc
+// puts you at 8,5 in Red's house and 7,4 in a Pokémon Center (Indigo Plateau
+// and One Island have their own spots, for when they're baked).
+const healLocations = JSON.parse(fs.readFileSync(path.join(DECOMP_DIR, 'src/data/heal_locations.json'), 'utf8')).heal_locations
+  .map((h) => ({ id: h.id, map: mapNameById(h.respawn_map), healer: h.respawn_npc }))
+  .filter((h) => baked.has(h.map))
+  .map((h) => (h.map === 'PalletTown_PlayersHouse_1F' ? { ...h, x: 8, y: 5, home: true } : { ...h, x: 7, y: 4, home: false }));
+console.log(`Heal points: ${healLocations.map((h) => h.id).join(', ') || 'none'}`);
+
 // Scripts and text for every person, sign, step-on trigger and map script in the bake.
 const roots = world.flatMap((w) => [
   ...w.data.objects.map((o) => o.script), ...w.data.signs.map((s) => s.script),
@@ -104,6 +114,8 @@ const roots = world.flatMap((w) => [
 ]);
 // Mom's lines after a whiteout, when Red's house is in the bake.
 if (baked.has('PalletTown_PlayersHouse_1F')) roots.push('EventScript_AfterWhiteOutMomHeal');
+// The nurse's, after a whiteout at a Pokémon Center.
+if (healLocations.some((h) => !h.home)) roots.push('EventScript_AfterWhiteOutHeal');
 const scripts = { ...bakeScripts(roots), startFlags: [...newGame().hiddenFlags] };
 console.log(`Scripts: ${Object.keys(scripts.scripts).length} scripts, ${Object.keys(scripts.text).length} texts`);
 
@@ -157,7 +169,7 @@ Object.assign(scripts.text, uiText([
   // the battle screen's party list and move forgetting
   'gText_ChoosePokemon', 'gText_PkmnHasNoEnergy', 'gText_PkmnAlreadyInBattle', 'gText_WhichMoveToForget',
   // waking up at home after a whiteout
-  'gText_PlayerScurriedBackHome',
+  'gText_PlayerScurriedBackHome', 'gText_PlayerScurriedToCenter',
   // the Bag in battle
   'gText_PkmnHPRestoredByVar2', 'gText_WontHaveEffect',
 ]));
@@ -169,7 +181,7 @@ console.log(`Pokémon: ${Object.keys(pokemon.species).length} species, ${Object.
 const DATA = path.join(OUT, 'data');
 fs.mkdirSync(DATA, { recursive: true });
 const layout = world.map(({ area, ox, oy, data }) => ({ map: data.name, area, ox, oy }));
-fs.writeFileSync(path.join(DATA, 'world.json'), JSON.stringify({ format: { name: 'pokered3d-world', version: 1 }, maps: layout, start }));
+fs.writeFileSync(path.join(DATA, 'world.json'), JSON.stringify({ format: { name: 'pokered3d-world', version: 1 }, maps: layout, start, healLocations }));
 fs.writeFileSync(path.join(DATA, 'scripts.json'), JSON.stringify(scripts));
 fs.writeFileSync(path.join(DATA, 'music.json'), JSON.stringify(music));
 fs.writeFileSync(path.join(DATA, 'pokemon.json'), JSON.stringify(pokemon));

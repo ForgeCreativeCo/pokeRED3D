@@ -32,7 +32,7 @@ behaviors:
   MB_POKEMART_SIGN: sign
   MB_INDIGO_PLATEAU_SIGN_*: sign
 
-  MB_COUNTER: furniture
+  MB_COUNTER: counter
   MB_BOOKSHELF: furniture
   MB_POKEMART_SHELF: furniture
   MB_PC: furniture

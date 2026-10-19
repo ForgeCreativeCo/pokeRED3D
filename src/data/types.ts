@@ -10,6 +10,20 @@ export interface WorldFile {
   maps: { map: string; area: number; ox: number; oy: number }[];
   /** Where a new game starts, when that map is in the bake. */
   start: { map: string; x: number; y: number; facing: Dir } | null;
+  /** Heal points whose room is in the bake: where whiting out wakes you (map folder name and cell), and who heals you. */
+  healLocations?: HealLocation[];
+}
+
+export interface HealLocation {
+  /** HEAL_LOCATION_…, as setrespawn names it */
+  id: string;
+  map: string;
+  x: number;
+  y: number;
+  /** the healer's local id (LOCALID_MOM, LOCALID_VIRIDIAN_NURSE, …) */
+  healer: string;
+  /** Red's house: Mom heals you, not a nurse */
+  home: boolean;
 }
 
 /** A textured quad: 4 corners (12 numbers) and a pixel rect in the atlas. */

@@ -20,6 +20,7 @@ classes:
   tree:        { geometry: billboard, colour: "#1b5e20", description: "Trees and bushes" }
   prop:        { geometry: billboard, colour: "#9c27b0", description: "Small blocking objects: fences, mailboxes, rocks" }
   sign:        { geometry: billboard, colour: "#00bcd4", description: "Readable sign" }
-  furniture:   { geometry: standing,  colour: "#795548", description: "Interior interactables: counters, shelves, PCs" }
+  furniture:   { geometry: standing,  colour: "#795548", description: "Interior interactables drawn from the front: shelves, PCs, TVs" }
+  counter:     { geometry: billboard, colour: "#ffc107", description: "Shop and Pokémon Center counters, drawn from above" }
   void:        { geometry: none,      colour: "#000000", description: "Black filler outside interiors" }
   unused:      { geometry: none,      colour: "#9e9e9e", description: "Never placed on any map" }

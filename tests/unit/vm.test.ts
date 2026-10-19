@@ -214,6 +214,34 @@ describe('ScriptVM', () => {
     expect(t.host.story.vars.VAR_RESULT).toBe(2);
   });
 
+  it('marks the heal point with setrespawn', async () => {
+    const t = setup({ Main: [['setrespawn', 'HEAL_LOCATION_VIRIDIAN_CITY']] });
+    expect(t.host.story.respawn).toBe('HEAL_LOCATION_PALLET_TOWN');
+    await t.vm.run('Main', null);
+    expect(t.host.story.respawn).toBe('HEAL_LOCATION_VIRIDIAN_CITY');
+  });
+
+  it("answers a YES / NO multichoice with the choice's index, as the nurse's script reads it", async () => {
+    const t = setup({
+      Main: [['multichoice', '19', '8', 'MULTICHOICE_YES_NO', 'FALSE | (TRUE << 1)'], ['switch', 'VAR_RESULT'], ['case', '0', 'Heal'], ['case', '1', 'Bye'], ['end']],
+      Heal: [['special', 'HealPlayerParty']], Bye: [['msgbox', 'T_Bye']],
+    }, { text: { T_Bye: 'bye' } });
+    await t.vm.run('Main', null); // the test text box always says YES
+    expect(t.host.story.vars.VAR_RESULT).toBe(0);
+    expect(t.healed).toEqual([1]);
+  });
+
+  it('puts the text colour back after a neutral line, as EventScript_RestorePrevTextColor does', async () => {
+    const t = setup({
+      Talk: [['msgbox', 'A'], ['textcolor', 'NPC_TEXT_COLOR_NEUTRAL'], ['msgbox', 'B'], ['call', 'Restore'], ['msgbox', 'C']],
+      Restore: [['copyvar', 'VAR_TEXT_COLOR', 'VAR_PREV_TEXT_COLOR'], ['return']],
+    }, { text: { A: 'a', B: 'b', C: 'c' }, textColors: { OAK: 'NPC_TEXT_COLOR_MALE' }, consts: { NPC_TEXT_COLOR_MALE: '0', NPC_TEXT_COLOR_NEUTRAL: '2' } },
+    { objects: [{ id: 'LOCALID_OAK', gfx: 'OAK', x: 2, y: 1, elevation: 3, movement: '', facing: 'down', range: [0, 0], script: 'Talk', flag: null }] });
+    await t.vm.run('Talk', t.npcs[0]);
+    expect(t.said).toEqual(['male: a', 'neutral: b', 'male: c']);
+    expect(t.host.story.vars).toEqual({}); // the colour belongs to the scene, not the save
+  });
+
   it('fills name buffers for the next text', async () => {
     const t = setup({ Main: [['bufferspeciesname', 'STR_VAR_1', 'SPECIES_MR_MIME']] });
     await t.vm.run('Main', null);

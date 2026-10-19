@@ -91,6 +91,8 @@ export function installHook(game: Game) {
       game.story.register(species, true);
       return hook.party();
     },
+    /** White out, as losing a wild battle does, without waiting for the scene after it. */
+    whiteOut() { void game.whiteOut(); return hook.tick(0.1); },
     /** How the last battle ended: 'won', 'lost' or 'ran' (null before any). */
     lastBattle: null as string | null,
     /** The battle on screen: its menu or text, and both Pokémon's HP ('closed' when there's none). */

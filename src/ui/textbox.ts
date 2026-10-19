@@ -50,7 +50,8 @@ export class TextBox {
   async say(raw: string, { style = 'normal' as BoxStyle, color = 'neutral' as TextColor, wait = true } = {}) {
     const { clock, input } = this;
     this.open(style, color);
-    const pages = this.format(raw).split('\\p');
+    // A closing \p (the C strings whiting out shows end in one) isn't a blank last page.
+    const pages = this.format(raw).replace(/\\p$/, '').split('\\p');
     for (let pi = 0; pi < pages.length; pi++) {
       const lines = pages[pi].split(/\\[nl]/);
       this.line1.textContent = this.line2.textContent = '';

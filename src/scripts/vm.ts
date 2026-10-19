@@ -4,7 +4,8 @@
 // The common commands run; ones the game can't do yet (battles, the bag,
 // fanfares, menus) are skipped so their scenes play their lines and go on.
 // givemon creates a real Pokémon in the party; showmonpic shows its picture;
-// item commands fill and check the Bag.
+// item commands fill and check the Bag. setrespawn marks the heal point
+// whiting out returns to.
 
 import type { Clock } from '../core/clock';
 import type { Input } from '../input/input';
@@ -58,6 +59,10 @@ interface RunContext {
   /** the person talked to, if any */
   target: Actor | null;
   color: TextColor;
+  /** NPC_TEXT_COLOR_… as a number (VAR_TEXT_COLOR) */
+  colorId: number;
+  /** the colour textcolor last replaced (VAR_PREV_TEXT_COLOR) */
+  prevColorId: number;
   style: BoxStyle;
   /** movements started by applymovement, awaited by waitmovement */
   moves: Promise<void>[];
@@ -130,15 +135,23 @@ export class ScriptVM {
     input.clearHeld();
     const ctx: RunContext = {
       target,
-      color: target ? TEXT_COLORS[this.value(this.data.textColors[target.gfx] ?? 'NPC_TEXT_COLOR_NEUTRAL') as number] ?? 'neutral' : 'neutral',
+      color: 'neutral',
+      prevColorId: 0,
+      colorId: Number(this.value(target ? this.data.textColors[target.gfx] ?? 'NPC_TEXT_COLOR_NEUTRAL' : 'NPC_TEXT_COLOR_NEUTRAL')),
       style: 'normal',
       moves: [],
     };
+    ctx.color = TEXT_COLORS[ctx.colorId] ?? 'neutral';
+    const setColor = (id: number) => { ctx.colorId = id; ctx.color = TEXT_COLORS[id] ?? ctx.color; };
     const stack: { body: Command[]; pc: number }[] = [];
     let body = scripts[label], pc = 0;
     let switchValue: Value = 0;
     const jump = (to: string | undefined) => { if (to && scripts[to]) { body = scripts[to]; pc = 0; return true; } return false; };
-    const value = (a: string | undefined) => this.value(a);
+    // The text colour vars belong to the scene, not the save.
+    const value = (a: string | undefined) => {
+      const v = this.resolve(a);
+      return v === 'VAR_TEXT_COLOR' ? ctx.colorId : v === 'VAR_PREV_TEXT_COLOR' ? ctx.prevColorId : this.value(a);
+    };
     const resolve = (a: string | undefined) => this.resolve(a);
     try {
       for (let steps = 0; steps < 2000; steps++) {
@@ -163,7 +176,11 @@ export class ScriptVM {
           case 'switch': switchValue = value(args[0]); break;
           case 'case': if (switchValue === value(args[0])) jump(args[1]); break;
           case 'setvar': story.vars[resolve(args[0])!] = value(args[1]); break;
-          case 'copyvar': story.vars[resolve(args[0])!] = value(args[1]); break;
+          case 'copyvar':
+            if (resolve(args[0]) === 'VAR_TEXT_COLOR') setColor(Number(value(args[1])));
+            else if (resolve(args[0]) === 'VAR_PREV_TEXT_COLOR') ctx.prevColorId = Number(value(args[1]));
+            else story.vars[resolve(args[0])!] = value(args[1]);
+            break;
           case 'addvar': story.vars[resolve(args[0])!] = (value(args[0]) as number) + (value(args[1]) as number); break;
           case 'subvar': story.vars[resolve(args[0])!] = (value(args[0]) as number) - (value(args[1]) as number); break;
           case 'setflag': story.flags.add(resolve(args[0])!); break;
@@ -175,6 +192,16 @@ export class ScriptVM {
             break;
           }
           case 'specialvar': story.vars[resolve(args[0])!] = 0; break;
+          case 'setrespawn': story.respawn = resolve(args[0])!; break;
+          case 'multichoice': {
+            // Only MULTICHOICE_YES_NO so far: VAR_RESULT is the choice's index (YES 0, NO 1).
+            // Other menus come back cancelled (SCR_MENU_CANCEL).
+            if (resolve(args[2]) === 'MULTICHOICE_YES_NO') story.vars.VAR_RESULT = (await textbox.yesNo()) ? 0 : 1;
+            else story.vars.VAR_RESULT = 127;
+            break;
+          }
+          case 'waitfieldeffect': await clock.delayFrames(90); break; // the Center's healing machine and its jingle
+          case 'pokemart': break; // shopping isn't in yet: the clerk says hello and goodbye
           case 'checkplayergender': story.vars.VAR_RESULT = 0; break;
           case 'waitfanfare': await clock.delayFrames(150); break; // the jingle holds "Obtained …" on screen
           // The Bag. Amounts default to 1; the item may come from a variable.
@@ -206,7 +233,8 @@ export class ScriptVM {
           case 'showmonpic': this.host.monPic.show(String(value(args[0]))); break;
           case 'hidemonpic': this.host.monPic.hide(); break;
           case 'faceplayer': if (target) faceToward(target, player); break;
-          case 'textcolor': ctx.color = TEXT_COLORS[value(args[0]) as number] ?? ctx.color; break;
+          // textcolor keeps the colour it replaces, for EventScript_RestorePrevTextColor to copy back.
+          case 'textcolor': ctx.prevColorId = ctx.colorId; setColor(value(args[0]) as number); break;
           case 'signmsg': ctx.style = 'sign'; break;
           case 'normalmsg': ctx.style = 'normal'; break;
           case 'msgbox': {
@@ -221,9 +249,9 @@ export class ScriptVM {
           case 'waitbuttonpress': await clock.until(input.takeA); break;
           case 'closemessage': textbox.close(); break;
           case 'giveitem_msg': {
-            // giveitem_msg TEXT, ITEM[, AMOUNT]: add it, then show the scene's own line.
+            // giveitem_msg TEXT, ITEM[, AMOUNT]: add it, then show the scene's own line, in neutral text (Std_ReceivedItem).
             const ok = story.bag.add(String(value(args[1])), Number(value(args[2] ?? '1')));
-            if (text[args[0]] != null) await textbox.say(text[args[0]], { color: ctx.color });
+            if (text[args[0]] != null) await textbox.say(text[args[0]], { color: 'neutral' });
             story.vars.VAR_RESULT = ok ? 1 : 0;
             break;
           }

@@ -21,6 +21,7 @@ function played() {
   s.money = 3500;
   s.playTime = 3725.6;
   s.options.textSpeed = 'FAST';
+  s.respawn = 'HEAL_LOCATION_VIRIDIAN_CITY';
   return s;
 }
 
@@ -47,15 +48,18 @@ describe('saving', () => {
     expect([...fresh.dex.caught]).toEqual(['SPECIES_BULBASAUR']);
     expect(fresh.playTime).toBe(3725);
     expect(fresh.options.textSpeed).toBe('FAST');
+    expect(fresh.respawn).toBe('HEAL_LOCATION_VIRIDIAN_CITY');
   });
 
-  it('loads an older save that has no PC box', () => {
+  it('loads an older save that has no PC box or heal point', () => {
     const save = makeSave(played(), { map: 'PalletTown', x: 0, y: 0, facing: 'down' });
     delete save.story.box;
+    delete save.story.respawn;
     const fresh = new Story([], 0, items, 3000);
     fresh.box.push(structuredClone(mon));
     applySave(fresh, save);
     expect(fresh.box).toEqual([]);
+    expect(fresh.respawn).toBe('HEAL_LOCATION_PALLET_TOWN');
   });
 
   it('copies the party, so later changes in the game don\'t reach the save', () => {

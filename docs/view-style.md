@@ -72,15 +72,27 @@ wrong. The rules (`standup.yaml`):
 
 - **The back wall stands at full height** (`indoor_full_walls`). Each column
   stands all its rows up, not just the bottom run, since rooms have no roofs.
+- **The back wall is everything blocked from the top of a column down to
+  the floor** (`indoor_back_wall`), whatever its tiles are classed as. Tile
+  classes come from every map using a tileset, and back-wall tiles get it
+  wrong: in the Pokémon Center the wall behind the nurse is walkable in other
+  layouts, the machine top in the corner is green enough to be a "tree", and
+  a plant's leaves leave the top row walkable. Classed by tile, each left a
+  hole or a stub in the wall. The top row counts even where it's walkable.
 - **Furniture against the back wall joins it** (`indoor_wall_furniture:
-  [furniture]`). Counters, shelves and the TV are painted as the wall's lower
-  rows, so they stand with it and the top of the wall stays level.
+  [furniture, counter]`). Counters, shelves and the TV are painted as the
+  wall's lower rows, so they stand with it and the top of the wall stays level.
 - **The back wall is only as deep as most of its columns.** Rows that reach
   further into the room lie flat on the floor. That covers the foot of a
   staircase and the railing around a stairwell going down: standing up, they
   made 3–4 tile towers.
 - **Freestanding props** (beds, tables, the lab machine) stay low blocks
   (`blocks`).
+- **Counters are low blocks too** (the `counter` class, from `MB_COUNTER`).
+  They're drawn from above, with the counter top painted over the nurse's or
+  clerk's legs. Standing up with that top row, a counter was 2 tiles tall and
+  hid the person behind it; as a block, the nurse shows from the waist up, as
+  on the GBA. Shelves stay `furniture` and stand.
 - Rooms are flat (`height.yaml` `flat_indoors`).
 
 ## Seeing through buildings
@@ -109,8 +121,8 @@ After baking a map, walk it in the preview and check:
 1. Red in front of a door: the door is a bit taller than him.
 2. Behind and between buildings: Red's silhouette shows, and a hidden door
    nearby shows its gold copy.
-3. Indoors: the back wall's top edge is level, nothing towers, and stairs
-   read as stairs.
+3. Indoors: the back wall's top edge is level with no holes, nothing towers,
+   stairs read as stairs, and whoever stands behind a counter shows above it.
 4. Tree rows, fences and signs: nothing pokes through a wall.
 
 If something breaks a rule, fix it in the rule or the baker so every map

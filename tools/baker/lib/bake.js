@@ -70,7 +70,24 @@ export function bakeMap(name, rules, lookup) {
   // ---- what stands up ----
   const buildingClasses = new Set(S.buildings.classes);
   const objectRules = S.objects;
-  const isBuildingCell = (c) => buildingClasses.has(c.e.class) || (c.walkable && c.e.top && buildingClasses.has(c.e.top));
+  // A room's back wall is everything blocked from the top of a column down to
+  // the first floor cell, whatever its tiles are classed as elsewhere: a wall
+  // tile that's walkable in other rooms, a plant or machine painted on the wall.
+  const backWall = new Set();
+  if (S.buildings.indoor_back_wall && map.map_type === 'MAP_TYPE_INDOOR') {
+    const isVoid = (c) => rules.classes[c.e.class].geometry === 'none';
+    for (let x = 0; x < W; x++) {
+      let y = 0;
+      while (y < H && isVoid(cell(x, y))) y++;
+      // The top row is wall even where something painted over it leaves it walkable.
+      for (let first = true; y < H; y++, first = false) {
+        const c = cell(x, y);
+        if (isVoid(c) || (c.walkable && !first)) break;
+        backWall.add(c);
+      }
+    }
+  }
+  const isBuildingCell = (c) => backWall.has(c) || buildingClasses.has(c.e.class) || (c.walkable && c.e.top && buildingClasses.has(c.e.top));
   const objectClassOf = (c) => {
     if (objectRules[c.e.class] && (!c.walkable || objectRules[c.e.class].walkable)) return c.e.class;
     if (c.walkable && c.e.top && objectRules[c.e.top]) return c.e.top; // overhang over a walkable cell

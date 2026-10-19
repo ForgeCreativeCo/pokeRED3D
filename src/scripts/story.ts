@@ -31,6 +31,8 @@ export class Story {
   money = 0;
   /** species seen and caught, for the Pokédex */
   readonly dex = { seen: new Set<string>(), caught: new Set<string>() };
+  /** the last heal point (setrespawn): where whiting out wakes you */
+  respawn = 'HEAL_LOCATION_PALLET_TOWN';
   /** seconds played */
   playTime = 0;
   options: Options = defaultOptions();

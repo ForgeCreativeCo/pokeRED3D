@@ -18,7 +18,7 @@ function load() {
   const scripts = new Map(), text = new Map(), consts = {};
   const mapDirs = fs.readdirSync(p('data/maps')).filter((d) => fs.existsSync(p('data/maps', d, 'scripts.inc')));
   const scriptFiles = [...mapDirs.map((d) => `data/maps/${d}/scripts.inc`), ...list('data/scripts', '.inc'), 'data/event_scripts.s'];
-  const textFiles = [...mapDirs.filter((d) => fs.existsSync(p('data/maps', d, 'text.inc'))).map((d) => `data/maps/${d}/text.inc`), ...list('data/text', '.inc')];
+  const textFiles = [...mapDirs.filter((d) => fs.existsSync(p('data/maps', d, 'text.inc'))).map((d) => `data/maps/${d}/text.inc`), ...list('data/text', '.inc'), 'data/event_scripts.s'];
 
   for (const file of scriptFiles) {
     let cur = null;
@@ -38,7 +38,10 @@ function load() {
       if (label && !macro) { cur = []; scripts.set(label[1], cur); continue; }
       if (line.startsWith('.')) continue;
       const [cmd, ...rest] = line.split(/\s+/);
-      const args = rest.join(' ').split(',').map((s) => s.trim()).filter(Boolean);
+      // Macro arguments are split by commas, or by spaces between plain words
+      // ("case 1 EventScript_…" in the nurse's script); expressions keep their spaces.
+      const args = rest.join(' ').split(',').map((s) => s.trim()).filter(Boolean)
+        .flatMap((a) => (/^\w+(\s+\w+)+$/.test(a) ? a.split(/\s+/) : [a]));
       if (macro) { macro.push([cmd, ...args]); continue; }
       if (!cur) continue;
       if (macros.has(cmd) && !args.length) cur.push(...macros.get(cmd));
@@ -54,7 +57,12 @@ function load() {
       if (s && cur) text.set(cur, text.get(cur) + s[1]);
     }
   }
-  for (const [k, v] of text) text.set(k, v.replace(/\$$/, ''));
+  // event_scripts.s mixes scripts and text: its script labels aren't text.
+  for (const [k, v] of text) {
+    if (!v && scripts.has(k)) { text.delete(k); continue; }
+    if (scripts.get(k)?.length === 0) scripts.delete(k);
+    text.set(k, v.replace(/\$$/, ''));
+  }
 
   // A few C constants the scripts compare against.
   for (const f of ['include/constants/global.h', 'include/constants/vars.h']) {

@@ -36,14 +36,18 @@ FireRed's opening, from a new save:
    rates. Lose and you wake up at home, a little poorer, with Mom fussing.
 7. Catch them: open the BAG in battle and throw a POKé BALL (or use a Potion).
    A catch joins your party, or goes to the PC when the party is full, and
-   the Pokédex marks it caught. (Nothing in the bake sells balls yet: the test
-   hook's `giveItem` hands them out.)
+   the Pokédex marks it caught.
+8. Oak's errand: in Viridian City's Poké Mart the clerk hands you Oak's
+   Parcel. Take it back to the lab, and Oak gives you the Pokédex and five
+   Poké Balls while Blue barges in to brag.
+9. Viridian's Pokémon Center: the nurse heals your party, and from then on
+   whiting out wakes you there, where she patches you up.
 
 Along the way:
 
-- **Five areas:** Pallet Town, Route 1, Route 21 North and Viridian City as
-  one connected outdoor world, plus Red's house (both floors), Blue's house
-  and Oak's lab.
+- **Seven areas:** Pallet Town, Route 1, Route 21 North and Viridian City as
+  one connected outdoor world, plus Red's house (both floors), Blue's house,
+  Oak's lab, and Viridian's Pokémon Center and Poké Mart.
 - **Movement like FireRed:** grid walking, turning on the spot, ledge hops,
   tall grass you wade into, doors, exit mats and stairs.
 - **People:** real overworld sprites with walk cycles and shadows, wandering
@@ -76,7 +80,7 @@ You need Node.js and git.
 ```bash
 npm install
 npm run setup:decomp     # once: clones pret/pokefirered into vendor/
-npm run bake -- PalletTown Route1 Route21_North ViridianCity PalletTown_PlayersHouse_1F PalletTown_PlayersHouse_2F PalletTown_RivalsHouse PalletTown_ProfessorOaksLab
+npm run bake -- PalletTown Route1 Route21_North ViridianCity PalletTown_PlayersHouse_1F PalletTown_PlayersHouse_2F PalletTown_RivalsHouse PalletTown_ProfessorOaksLab ViridianCity_PokemonCenter_1F ViridianCity_Mart
 npm run dev              # then open http://localhost:5173
 ```
 
@@ -96,7 +100,7 @@ Other commands:
 | `npm run build:single` | Build one self-contained page, `dist-single/index.html`, with the baked data inside; it opens straight from disk |
 | `npm run build:artifact` | The single-file page shaped for publishing as a claude.ai Artifact: `dist-single/pokered3d.html` |
 | `npm test` | Unit tests |
-| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`, `save`, `battle`) in a build and compare it with its golden transcript |
+| `npm run playthrough -- <name> --check [dev|dist|single]` | Play a scene (`opening`, `party`, `save`, `battle`, `wild`, `catch`, `parcel`) in a build and compare it with its golden transcript |
 
 Map names are folder names under `vendor/pokefirered/data/maps`. The first map
 in a bake is the origin; connected maps join it, and interiors become their
@@ -214,7 +218,10 @@ would; `["advance"]` stops at battle menus as it does at a YES / NO, and
 `["wander"]` walks down and up until a wild Pokémon appears. `wild.json`
 walks Route 1's grass into a Pidgey and beats it, then into a Rattata and runs;
 `catch.json` tries a Potion that won't have any effect, then throws POKé BALLs
-with `["catch"]` until a Pidgey is caught.
+with `["catch"]` until a Pidgey is caught. `parcel.json` plays the opening
+through Blue's battle, then Oak's errand: the Viridian Mart clerk's parcel
+scene, the nurse healing (and `["whiteOut"]` waking up at her Center), and
+Oak's Pokédex scene back at the lab.
 
 ```bash
 npm run playthrough -- opening --check          # against the dev server
@@ -243,7 +250,7 @@ running in any browser and publishable as a single page.
 | ✓ | **Pokémon and the party** | Species, stats, moves and learnsets from the decomp; `givemon` makes the starter real; Pokémon pictures in scenes; party screen and summaries |
 | ✓ | **Start menu and saving** | The menu (Pokédex, Pokémon, Bag, trainer card, Save, Option); the Bag and item commands; save and Continue |
 | ✓ | **Battles** | ✓ battle data baked (types, wild tables, trainers, pictures, backgrounds, songs) · ✓ core mechanics ported from the decomp (damage, types, accuracy, status, experience) · ✓ battle screen and UI · ✓ Blue in the lab (`trainerbattle_earlyrival`, Oak's tutorial) · ✓ wild encounters in tall grass, and whiting out · ✓ catching, and the Bag in battle |
-| 6 | **Grow the world** | Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
+| 6 | **Grow the world** | ✓ Viridian's Pokémon Center and Poké Mart (back walls and counters ruled for the new tilesets), Oak's Parcel and the Pokédex, the nurse and heal points · Viridian Forest, Pewter City and onwards, tuning the rules as new tilesets arrive |
 
 ### Polish track
 
@@ -261,11 +268,18 @@ This runs alongside the steps above:
 
 ### Known gaps
 
-- Whiting out always takes you to Red's house: Pallet Town is the only heal
-  point in the bake. FireRed shows "scurried back home" on a black screen;
-  here the room is already showing. Repel and the other encounter-rate
-  items aren't in yet. Double battles (Route 21 North's Lil & Ian) still
-  just say their challenge.
+- Whiting out takes you to the last heal point (Red's house, or the Viridian
+  Pokémon Center once you've been in). FireRed shows the "scurried" line on
+  a black screen; here the room is already showing. Repel and the other
+  encounter-rate items aren't in yet. Double battles (Route 21 North's Lil &
+  Ian) still just say their challenge.
+- Shopping isn't in yet: a Poké Mart clerk says hello and goodbye, with no
+  BUY / SELL menu. The nurse's healing jingle and the Center's machine
+  animation are a pause, as fanfares are elsewhere. The Pokémon Center's
+  2F isn't baked yet.
+- Map scripts that change tiles at runtime (`setmetatile`) aren't applied:
+  the Viridian Mart's questionnaire stand is already on the counter before
+  you have the Pokédex.
 - There's no naming screen yet: saying YES to a nickname keeps the species
   name.
 - Outside battle, items can't be used yet (Oak tells you it isn't the time),

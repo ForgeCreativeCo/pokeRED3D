@@ -20,7 +20,8 @@ buildings:
   min_wall_rows: 1           # columns with no wall rows still get this much wall
   sides: true                # close off the left / right ends
   indoor_full_walls: true    # indoors (no roofs), each column stands all its rows up as wall
-  indoor_wall_furniture: [furniture]  # ...along with these classes right below it
+  indoor_wall_furniture: [furniture, counter]  # ...along with these classes right below it
+  indoor_back_wall: true     # indoors, every blocked cell from a column's top down to the floor is back wall, whatever its class
 
 # Objects: everything else that stands up. Cells of these classes are grouped
 # into vertical stacks per column (including any overhang cell on top), cut
@@ -42,6 +43,7 @@ objects:
   sign: { max_rows: 2 }
   ledge: { max_rows: 1, height_per_row: 0.5, ground: keep }
   furniture: { max_rows: 2 }
+  counter: { max_rows: 2 }
 
 # Cutting objects out of their background. A standing quad starts as the full
 # metatile art; any pixel identical to the same pixel of the nearest plain
@@ -58,9 +60,10 @@ shade_amount: 0.45   # how much `shade` darkens
 # Low blocks. Indoor furniture (beds, tables, the lab's machine) is drawn
 # top-down in the art, so standing it up shows the floor behind it as a wall.
 # Instead it becomes a low block: the art on a raised top, with a short front
-# face. Shelves, PCs and TVs are `furniture` and still stand, since their art
-# is drawn from the front.
+# face. Counters too: standing up with the counter top painted over the
+# nurse's legs, they hid her. Shelves, PCs and TVs are `furniture` and still
+# stand, since their art is drawn from the front.
 blocks:
   maps: indoor     # indoor maps only; outdoors, props really are upright
-  classes: [prop]
+  classes: [prop, counter]
   height: 0.45     # tiles
