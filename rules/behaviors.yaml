@@ -28,8 +28,8 @@ behaviors:
   MB_CAVE_DOOR: door
 
   MB_SIGNPOST: sign
-  MB_POKEMON_CENTER_SIGN: sign
-  MB_POKEMART_SIGN: sign
+  MB_POKEMON_CENTER_SIGN: wall  # "P.C" painted on the building front
+  MB_POKEMART_SIGN: wall        # "MART" painted on the building front
   MB_INDIGO_PLATEAU_SIGN_*: sign
 
   MB_COUNTER: counter

@@ -36,9 +36,9 @@ const keyOf = (pair, id) => `${(id < NUM_METATILES_IN_PRIMARY ? pair.primary : p
  * Gather placement statistics for every metatile of the given tilesets, from
  * every layout that uses any of them.
  */
-const blankStat = () => ({ placements: 0, walkable: 0, wallDepth: [], column: [], freestanding: 0, below: [] });
+const blankStat = () => ({ placements: 0, walkable: 0, wallDepth: [], column: [], freestanding: 0, below: [], building: 0 });
 
-function gatherStats(tilesetSymbols, cfg) {
+function gatherStats(tilesetSymbols, cfg, isDoor) {
   const wanted = new Set(tilesetSymbols);
   const stats = new Map(); // key -> blankStat()
   const stat = (key) => {
@@ -83,6 +83,20 @@ function gatherStats(tilesetSymbols, cfg) {
         // (Buildings are taller than freestanding_max_rows.)
         if (groundBelow && open(top - 1)) s.freestanding++;
       }
+
+    // A building is whatever stands joined to a door: the blocked run along the
+    // door's row, and each of those columns up to its top. Small houses are
+    // no taller than a table, and their roofs can be as green as a tree, so
+    // this is what tells them apart.
+    const inBuilding = new Set();
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        if (!isDoor(pair, at(x, y).metatile)) continue;
+        for (const dx of [-1, 1])
+          for (let xx = dx < 0 ? x : x + 1; xx >= 0 && xx < w && solid(xx, y); xx += dx)
+            for (let yy = y; solid(xx, yy); yy--) inBuilding.add(yy * w + xx);
+      }
+    for (const i of inBuilding) stat(keyOf(pair, cells[i].metatile)).building++;
   }
   return stats;
 }
@@ -134,7 +148,11 @@ function layerMask(pair, mt, layer) {
 export function classifyTilesets(tilesetSymbols, rules) {
   const cfg = rules.classifier;
   const names = behaviorNames();
-  const stats = gatherStats(tilesetSymbols, cfg);
+  const isDoor = (pair, id) => {
+    const mt = id < NUM_METATILES_IN_PRIMARY ? pair.primary.metatiles[id] : pair.secondary.metatiles[id - NUM_METATILES_IN_PRIMARY];
+    return !!mt && rules.behavior(names.get(mt.behavior))?.class === 'door';
+  };
+  const stats = gatherStats(tilesetSymbols, cfg, isDoor);
   const result = new Map();
   const byKey = new Map();
 
@@ -196,13 +214,17 @@ export function classifyTilesets(tilesetSymbols, rules) {
           return { class: 'prop', source: 'auto' };
         }
         const blocked = s.placements - s.walkable;
-        if (column <= cfg.freestanding_max_rows && s.freestanding >= blocked / 2) {
+        const building = s.building >= blocked / 2;
+        if (building) {
+          // Joined to a door: wall or roof by depth, whatever its size or colour.
+          entry.reasons.push(`joined to a door in ${Math.round((s.building / blocked) * 100)}% of placements`);
+        } else if (column <= cfg.freestanding_max_rows && s.freestanding >= blocked / 2) {
           entry.reasons.push(`freestanding, ${column} rows with floor in front and behind`);
           return { class: 'prop', source: 'auto' };
         }
         const green = greenness(pair, id, coverage);
         entry.stats.green = Number(green.toFixed(2));
-        if (green >= cfg.tree_min_green) {
+        if (green >= cfg.tree_min_green && !building) {
           entry.reasons.push(`green ${(green * 100).toFixed(0)}%`);
           return { class: 'tree', source: 'auto' };
         }

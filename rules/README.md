@@ -53,6 +53,8 @@ Rules are tried in priority order. Each step can be overridden by the ones after
 - **Wall or roof.** For a blocked cell, count rows down to walkable ground. With `wall_max_rows` (2) or fewer it's a wall face; above that it's roof. This splits houses and the lab at the right row.
 - **Prop.** A blocked column only one cell tall is a fence, mailbox or similar.
 - **Tree.** Blocked and mostly green.
+- **Building.** Blocked cells joined to a door (the blocked run along the door's row, and each of those columns up to its top) are wall or roof by depth, whatever their colour or size. Viridian's green-roofed houses are only 3 rows tall, the size of a table, with roofs green enough to pass for trees; without this they stood up as leaning cards.
+- **Building signs.** The "P.C" and "MART" signs (`MB_POKEMON_CENTER_SIGN`, `MB_POKEMART_SIGN`) are painted on the front wall, so they're `wall`. As signs they cut their columns out of the wall: the Mart's roof stood up as a flat panel.
 - **Overhang (`top`).** On FireRed, a metatile's second layer draws *above* sprites, except for `covered` metatiles. A walkable metatile with enough pixels there has something drawn over the player, such as a roof edge or tree top. It gets `top: <class>`, taken from the cell **below**, because an overhang is the upper part of the object standing there.
 
 ### Classes (`classes.yaml`)
