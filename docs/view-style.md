@@ -64,6 +64,16 @@ everything else follows from it. Check with Red standing in front of a door.
   line stays straight.
 - Side walls close the ends. They only follow a roof slope when the column
   has a roof.
+- **A building is what's joined to a door**, whatever its size or colour
+  (`classifier.yaml`). Viridian's houses are only 3 rows tall with green
+  roofs, and stood up as leaning tree cards before this; the gym's set-back
+  wings stood as props.
+- **Green eaves are roof** (`green_eaves`). A green row above the bottom
+  wall row is the roof's eaves, so a green-roofed house is one storey, not a
+  green "second floor".
+- **Signs painted on a front are wall** (the P.C and MART signs).
+- **No door, no slope.** Cliffs and rock are drawn like buildings, but with
+  a level top.
 
 ## Rooms
 

@@ -19,6 +19,7 @@ buildings:
   roof_rise: 0.9             # extra height at the back edge of the roof
   min_wall_rows: 1           # columns with no wall rows still get this much wall
   sides: true                # close off the left / right ends
+  green_eaves: true          # outdoors, a green wall row above the bottom one is a green roof's eaves, not wall
   indoor_full_walls: true    # indoors (no roofs), each column stands all its rows up as wall
   indoor_wall_furniture: [furniture, counter]  # ...along with these classes right below it
   indoor_back_wall: true     # indoors, every blocked cell from a column's top down to the floor is back wall, whatever its class

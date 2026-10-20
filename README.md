@@ -288,9 +288,13 @@ This runs alongside the steps above:
   keeps what's caught with a full party, but there's no PC to visit yet.
 - A save lives in the browser that made it (each Artifact link is its own
   site), so it doesn't follow you to another browser or device.
-- NPCs whose sprite is chosen at runtime (`OBJ_EVENT_GFX_VAR_*`) show as a
-  placeholder marker.
+- NPCs whose sprite is chosen at runtime (`OBJ_EVENT_GFX_VAR_*`) take it
+  from the map's own scripts (Viridian's old man); one set from anywhere
+  else would show nothing.
+- With the camera low and fixed facing north, a building hides Red for a
+  few rows behind it (his silhouette shows through). Viridian's tight grid
+  makes this common; fading the building in the way is the planned fix.
 - The synth approximates the Game Boy channels' envelope timing and the
   engine's reverb, so songs sound close to FireRed but not identical.
-- Rocky cliffs are classed as roofs, and some shoreline tiles come out as
-  ground or roof.
+- Rocky cliffs stand as level-topped blocks built like buildings, not as
+  their own class yet, and some shoreline tiles come out as ground or roof.

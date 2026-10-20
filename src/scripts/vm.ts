@@ -375,6 +375,9 @@ export class ScriptVM {
     for (const a of npcs) {
       if (a.area !== world.area) continue;
       a.removed = !!a.flag && a.flag !== '0' && story.flags.has(a.flag);
+      // A sprite chosen at runtime (OBJ_EVENT_GFX_VAR_n) comes from VAR_OBJ_GFX_ID_n.
+      const v = a.gfx.match(/^OBJ_EVENT_GFX_VAR_(\w)$/);
+      if (v) a.s = a.m.data.sprites[String(this.value(`VAR_OBJ_GFX_ID_${v[1]}`))] ?? a.s;
     }
   }
 

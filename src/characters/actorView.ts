@@ -32,12 +32,13 @@ export class ActorViews {
     const tilt = new THREE.Group();
     root.add(tilt);
     let sprite: View['sprite'] = null;
-    if (a.s) {
+    // A sprite chosen at runtime (OBJ_EVENT_GFX_VAR_n) arrives when its map's scripts run.
+    if (a.s || /^OBJ_EVENT_GFX_VAR_/.test(a.gfx)) {
       const geo = new THREE.PlaneGeometry(1, 1);
       geo.translate(0, 0.5, 0); // pivot at the feet
       sprite = new THREE.Mesh(geo, this.spriteMat(a.m));
       tilt.add(sprite);
-      const sh = new THREE.Mesh(new THREE.CircleGeometry(a.s.shadow, 20), this.shadowMat);
+      const sh = new THREE.Mesh(new THREE.CircleGeometry(a.s?.shadow ?? 0.3, 20), this.shadowMat);
       sh.rotation.x = -Math.PI / 2;
       sh.scale.y = 0.55;
       sh.position.y = 0.02;
@@ -97,6 +98,7 @@ export class ActorViews {
     v.root.position.set(x + Math.sin(yaw) * off, pos.h, z + Math.cos(yaw) * off);
     v.root.rotation.y = yaw;
     v.tilt.position.y = pos.lift; // the shadow stays on the ground
+    if (v.sprite) v.sprite.visible = !!a.s;
     if (!v.sprite || !a.s) return;
     v.tilt.rotation.x = (-this.bb.lean * Math.PI) / 180;
     const [sx, sy] = this.spriteScale(a, pitchDeg);

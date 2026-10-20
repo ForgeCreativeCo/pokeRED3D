@@ -5,7 +5,9 @@
 // as seen in its texture, and `uv` is the pixel rect [u0, v0, u1, v1] in the
 // atlas (v grows downward), so the texture's bottom edge maps to p0-p1.
 
-import { readMap, readLayout, tilesetPair, metatileFor, mapNameById, newGame, NUM_METATILES_IN_PRIMARY } from './decomp.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DECOMP_DIR, readMap, readLayout, tilesetPair, metatileFor, mapNameById, newGame, NUM_METATILES_IN_PRIMARY } from './decomp.js';
 import { renderMetatile, Image, AtlasPacker } from './raster.js';
 import { readSprite } from './sprites.js';
 
@@ -98,6 +100,14 @@ export function bakeMap(name, rules, lookup) {
   const quads = [];
   const quad = (kind, p, uv, alpha = false) => quads.push({ k: kind, p: p.flat().map((v) => +v.toFixed(4)), uv, a: alpha ? 1 : 0 });
 
+  /** Fraction of a cell's pixels that are green (the classifier's tree test). */
+  const greenness = (c) => {
+    const { data } = renderMetatile(pair, c.metatile);
+    let green = 0;
+    for (let p = 0; p < 256; p++) if (data[p * 4 + 1] > data[p * 4] + 15 && data[p * 4 + 1] > data[p * 4 + 2]) green++;
+    return green / 256;
+  };
+
   /** Stack metatile images vertically, top row first. */
   const stack = (list) => {
     const img = new Image(16, 16 * list.length);
@@ -158,6 +168,13 @@ export function bakeMap(name, rules, lookup) {
       }
       let wallRows = 0;
       for (let i = list.length - 1; i >= 0 && wallClasses.has(list[i].e.class) && !list[i].walkable; i--) wallRows++;
+      // Outdoors, a green "wall" row above the bottom one is a green roof's
+      // eaves (Viridian's houses): the wall stops below it.
+      if (!fullWalls && S.buildings.green_eaves) {
+        let n = Math.min(1, wallRows); // the bottom row is always wall
+        while (n < wallRows && greenness(list[list.length - 1 - n]) < rules.classifier.tree_min_green) n++;
+        wallRows = n;
+      }
       return { x, list, wallRows };
     });
     // A room's back wall stands only as deep as most of its columns. Rows that
@@ -171,7 +188,8 @@ export function bakeMap(name, rules, lookup) {
     // One wall height for the whole building keeps the roof line straight.
     const rowsMode = mode(cols.map((c) => c.wallRows).filter((n) => n > 0)) ?? S.buildings.min_wall_rows;
     const wallH = Math.max(rowsMode, S.buildings.min_wall_rows) * perRow;
-    const rise = S.buildings.roof_rise;
+    // No door: rock and cliffs drawn like buildings, so the top stays level.
+    const rise = comp.some((c) => c.e.class === 'door') ? S.buildings.roof_rise : 0;
     const front = Math.max(...comp.map((c) => c.y)) + 1;
     const base = cell(cols[0].x, front)?.h ?? Math.min(...comp.map((c) => c.h));
 
@@ -325,7 +343,15 @@ export function bakeMap(name, rules, lookup) {
   const B = rules.billboards;
   const { hiddenFlags } = newGame();
   const sprites = {};
-  for (const gfx of new Set([B.player, ...(map.object_events ?? []).map((o) => o.graphics_id)])) {
+  // People whose sprite is chosen at runtime (OBJ_EVENT_GFX_VAR_n) get every
+  // sprite the map's scripts put in VAR_OBJ_GFX_ID_n (Viridian's old man, lying
+  // across the road or standing beside it).
+  const scriptsFile = path.join(DECOMP_DIR, 'data/maps', name, 'scripts.inc');
+  const varSprites = fs.existsSync(scriptsFile)
+    ? [...fs.readFileSync(scriptsFile, 'utf8').matchAll(/setvar\s+VAR_OBJ_GFX_ID_\w+\s*,\s*(OBJ_EVENT_GFX_\w+)/g)].map((m) => m[1])
+    : [];
+  for (const gfx of new Set([B.player, ...(map.object_events ?? []).map((o) => o.graphics_id), ...varSprites])) {
+    if (/^OBJ_EVENT_GFX_VAR_/.test(gfx)) continue;
     try {
       const s = readSprite(gfx);
       sprites[gfx] = { width: s.width, height: s.height, shadow: B.shadows?.[s.shadowSize] ?? 0.3, frames: s.frames.map((f) => packer.add(f)) };

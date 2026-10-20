@@ -84,18 +84,28 @@ function gatherStats(tilesetSymbols, cfg, isDoor) {
         if (groundBelow && open(top - 1)) s.freestanding++;
       }
 
-    // A building is whatever stands joined to a door: the blocked run along the
-    // door's row, and each of those columns up to its top. Small houses are
-    // no taller than a table, and their roofs can be as green as a tree, so
-    // this is what tells them apart.
-    const inBuilding = new Set();
+    // A building is whatever is joined to a door. Small houses are no taller
+    // than a table, and their roofs can be as green as a tree, so this is what
+    // tells them apart. It spreads from the door through blocked cells that
+    // aren't green (walls, including a gym's set-back wings), and each column
+    // reached adds everything above it (a green roof); trees and bushes don't
+    // carry it on, so a forest beside a house stays a forest.
+    const walls = new Set();
+    const queue = [];
     for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        if (!isDoor(pair, at(x, y).metatile)) continue;
-        for (const dx of [-1, 1])
-          for (let xx = dx < 0 ? x : x + 1; xx >= 0 && xx < w && solid(xx, y); xx += dx)
-            for (let yy = y; solid(xx, yy); yy--) inBuilding.add(yy * w + xx);
+      for (let x = 0; x < w; x++) if (isDoor(pair, at(x, y).metatile)) { walls.add(y * w + x); queue.push([x, y]); }
+    while (queue.length) {
+      const [x, y] = queue.pop();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || nx >= w || !solid(nx, ny) || walls.has(ny * w + nx)) continue;
+        if (greenOf(pair, at(nx, ny).metatile) >= cfg.tree_min_green) continue;
+        walls.add(ny * w + nx);
+        queue.push([nx, ny]);
       }
+    }
+    const inBuilding = new Set(walls);
+    for (const i of walls) for (let y = Math.floor(i / w) - 1, x = i % w; solid(x, y); y--) inBuilding.add(y * w + x);
     for (const i of inBuilding) stat(keyOf(pair, cells[i].metatile)).building++;
   }
   return stats;
@@ -113,6 +123,17 @@ function darkness(pair, id) {
   for (let p = 0; p < 256; p++) if (img.data[p * 4] + img.data[p * 4 + 1] + img.data[p * 4 + 2] < 60) dark++;
   darknessCache.set(key, dark / 256);
   return dark / 256;
+}
+
+const greenCache = new Map();
+/** greenness(), worked out once per metatile of a tileset pair. */
+function greenOf(pair, id) {
+  const key = `${pair.primary.key}/${pair.secondary.key}:${id}`;
+  if (!greenCache.has(key)) {
+    const mt = id < NUM_METATILES_IN_PRIMARY ? pair.primary.metatiles[id] : pair.secondary.metatiles[id - NUM_METATILES_IN_PRIMARY];
+    greenCache.set(key, mt ? greenness(pair, id, layerCoverage(pair, mt)) : 0);
+  }
+  return greenCache.get(key);
 }
 
 /** Fraction of a metatile's foreground pixels that are green. */
