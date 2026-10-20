@@ -36,6 +36,8 @@ export interface Quad {
   uv: [number, number, number, number];
   /** 1: alpha-tested cutout */
   a: 0 | 1;
+  /** the building this wall, roof or side belongs to (its index in the map), for fading it when it hides the player */
+  b?: number;
 }
 
 export interface CameraPreset {

@@ -1,8 +1,10 @@
-// A map's baked quads as three.js meshes: one opaque, one alpha-tested.
+// A map's baked quads as three.js meshes: one opaque, one alpha-tested, and
+// each building on its own so it can fade when it hides the player.
 
 import * as THREE from 'three';
 import type { Quad } from '../data/types';
 import type { LoadedMap } from '../data/load';
+import { addDither, groupByBuilding, type FadingBuilding } from './buildingFade';
 
 /**
  * Two triangles per quad, in world space (the map's offset applied) with
@@ -52,6 +54,8 @@ export interface MapMeshes {
   materials: { lit: [THREE.Material, THREE.Material]; flat: [THREE.Material, THREE.Material] };
   /** for the people billboards, whose frames are in this map's atlas */
   sprite: THREE.Material;
+  /** each building's meshes (lit and flat materials in userData), with its box and fade */
+  buildings: FadingBuilding[];
 }
 
 export function buildMapMeshes(m: LoadedMap): MapMeshes {
@@ -62,11 +66,32 @@ export function buildMapMeshes(m: LoadedMap): MapMeshes {
     flat: [new THREE.MeshBasicMaterial({ map: texture, side }), new THREE.MeshBasicMaterial({ map: texture, side, alphaTest: 0.5 })],
   };
   const sprite = new THREE.MeshBasicMaterial({ map: texture, alphaTest: 0.5, side });
+  // Buildings: their own meshes and materials, dithering away together by one fade value.
+  const buildings: FadingBuilding[] = [];
+  for (const quads of groupByBuilding(m.data.quads).values()) {
+    const fade = { value: 0 };
+    const meshes: THREE.Mesh[] = [];
+    for (const cut of [false, true]) {
+      const part = quads.filter((q) => !!q.a === cut);
+      if (!part.length) continue;
+      const mats = { lit: materials.lit[cut ? 1 : 0].clone(), flat: materials.flat[cut ? 1 : 0].clone() };
+      addDither(mats.lit, fade);
+      addDither(mats.flat, fade);
+      const mesh = new THREE.Mesh(geometry(part, m), mats.lit);
+      mesh.userData = mats;
+      meshes.push(mesh);
+    }
+    const box = new THREE.Box3();
+    for (const mesh of meshes) { mesh.geometry.computeBoundingBox(); box.union(mesh.geometry.boundingBox!); }
+    buildings.push({ box, fade, meshes });
+  }
+  const rest = m.data.quads.filter((q) => q.b === undefined);
   return {
     texture,
     sprite,
-    opaque: new THREE.Mesh(geometry(m.data.quads.filter((q) => !q.a), m), materials.lit[0]),
-    cutout: new THREE.Mesh(geometry(m.data.quads.filter((q) => q.a), m), materials.lit[1]),
+    opaque: new THREE.Mesh(geometry(rest.filter((q) => !q.a), m), materials.lit[0]),
+    cutout: new THREE.Mesh(geometry(rest.filter((q) => q.a), m), materials.lit[1]),
     materials,
+    buildings,
   };
 }

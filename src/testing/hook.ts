@@ -91,6 +91,12 @@ export function installHook(game: Game) {
       game.story.register(species, true);
       return hook.party();
     },
+    /** How far each faded building has faded (0 to 1), by map and building: buildings hiding the player. */
+    faded() {
+      const out: Record<string, number> = {};
+      for (const [m, mm] of game.stage.meshes) mm.buildings.forEach((b, i) => { if (b.fade.value > 0) out[`${m.data.name}#${i}`] = +b.fade.value.toFixed(2); });
+      return out;
+    },
     /** White out, as losing a wild battle does, without waiting for the scene after it. */
     whiteOut() { void game.whiteOut(); return hook.tick(0.1); },
     /** How the last battle ended: 'won', 'lost' or 'ran' (null before any). */

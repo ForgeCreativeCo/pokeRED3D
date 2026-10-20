@@ -291,9 +291,8 @@ This runs alongside the steps above:
 - NPCs whose sprite is chosen at runtime (`OBJ_EVENT_GFX_VAR_*`) take it
   from the map's own scripts (Viridian's old man); one set from anywhere
   else would show nothing.
-- With the camera low and fixed facing north, a building hides Red for a
-  few rows behind it (his silhouette shows through). Viridian's tight grid
-  makes this common; fading the building in the way is the planned fix.
+- A building between the camera and Red dithers away, but trees don't:
+  behind a row of trees only his silhouette shows.
 - The synth approximates the Game Boy channels' envelope timing and the
   engine's reverb, so songs sound close to FireRed but not identical.
 - Rocky cliffs stand as level-topped blocks built like buildings, not as

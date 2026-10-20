@@ -98,7 +98,9 @@ export function bakeMap(name, rules, lookup) {
 
   const packer = new AtlasPacker(1024);
   const quads = [];
-  const quad = (kind, p, uv, alpha = false) => quads.push({ k: kind, p: p.flat().map((v) => +v.toFixed(4)), uv, a: alpha ? 1 : 0 });
+  /** the building the quads being made belong to (null outside the buildings pass) */
+  let building = null;
+  const quad = (kind, p, uv, alpha = false) => quads.push({ k: kind, p: p.flat().map((v) => +v.toFixed(4)), uv, a: alpha ? 1 : 0, ...(building !== null && { b: building }) });
 
   /** Fraction of a cell's pixels that are green (the classifier's tree test). */
   const greenness = (c) => {
@@ -150,7 +152,8 @@ export function bakeMap(name, rules, lookup) {
   // Rooms have no roofs: indoors, each column of the back wall stands its whole stack up.
   const fullWalls = S.buildings.indoor_full_walls && map.map_type === 'MAP_TYPE_INDOOR';
   const perRow = (map.map_type === 'MAP_TYPE_INDOOR' && S.buildings.indoor_wall_height_per_row) || S.buildings.wall_height_per_row;
-  for (const comp of buildings) {
+  for (const [bi, comp] of buildings.entries()) {
+    building = bi;
     const columns = new Map();
     for (const c of comp) {
       if (!columns.has(c.x)) columns.set(c.x, []);
@@ -224,8 +227,9 @@ export function bakeMap(name, rules, lookup) {
         quad('side', [[sx, base, solidBack], [sx, base, col.zFront], [sx, base + col.h, col.zFront], [sx, base + col.h + col.rise * t, solidBack]], uv);
       }
     }
-    buildings[buildings.indexOf(comp)] = { cells: comp.length, front, wallHeight: wallH, x0: cols[0].x, x1: cols[cols.length - 1].x + 1 };
+    buildings[bi] = { cells: comp.length, front, wallHeight: wallH, x0: cols[0].x, x1: cols[cols.length - 1].x + 1 };
   }
+  building = null;
   const inBuilding = new Set();
   for (const c of seen) inBuilding.add(c);
 

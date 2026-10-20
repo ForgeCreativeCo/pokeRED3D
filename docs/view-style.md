@@ -107,9 +107,17 @@ wrong. The rules (`standup.yaml`):
 
 ## Seeing through buildings
 
-A low camera means buildings sometimes cover what you need to see. The rule
-is to show what matters through the building, faintly, and only nearby. It's
-done in the renderer, so it needs nothing from the maps.
+A low camera means buildings sometimes cover what you need to see. Two
+rules handle it, both in the renderer:
+
+- **The building in the way fades.** Any building between the camera and
+  Red (a ray from the camera to his feet or head crosses its box) dithers
+  away to a faint screen-door ghost of itself, easing in and out over about
+  0.2 s, and comes back once he's clear. Dithering keeps the pixel look and
+  needs no transparency sorting. The baker tags each building's walls,
+  roof and sides with its index (`b` on a quad), so each building is its
+  own mesh. `src/render/buildingFade.ts`; `MAX_FADE` is how much drops out.
+- **What matters shows through, faintly, and only nearby:**
 
 | What | How | Where |
 |---|---|---|
@@ -122,7 +130,8 @@ appears where something nearer has already been drawn. Keep the distance
 limit: without it, far-off NPCs show through every house.
 
 Walk-behind rows (the roof overhang that hides the player on the GBA)
-still hide the player. The silhouette shows Red there.
+count as being behind the building: it fades. Trees don't fade; the
+silhouette shows Red behind them.
 
 ## Checking a new map
 
@@ -144,9 +153,6 @@ gets the fix. Per-map overrides are a last resort.
   signs) pixel by pixel, so they keep their thickness at a low angle. That's
   the next step toward the reference. Voxel roofs and window ledges come
   after.
-- **Fading the building in the way**, instead of only showing things through
-  it. Buildings would first need their own meshes; today the baker merges
-  them.
 - **The camera always faces north.** Walking south, you see little of what's
   ahead, since the camera sits there. Turning the camera would change the
   controls.

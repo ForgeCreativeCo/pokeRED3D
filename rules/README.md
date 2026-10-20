@@ -116,6 +116,7 @@ player in the walk-behind row just like on the GBA.
 - `p` holds 4 corners: bottom-left, bottom-right, top-right, top-left *as seen in the texture*.
 - `uv` is a pixel rect in the atlas with v growing downward. `a: 1` means alpha-tested (cutout).
 - `k` is `ground`, `water`, `step`, `wall`, `roof`, `side`, or an object class.
+- `b`, on a building's `wall`, `roof` and `side` quads, is the building's index in the map. The game draws each building as its own mesh so the one hiding the player can fade.
 
 Quads in JSON keep the format engine-neutral: the game reads them with
 three.js today, and a glTF export could be generated from the same data if

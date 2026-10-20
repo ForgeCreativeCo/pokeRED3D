@@ -33,6 +33,7 @@ import { whiteOutLoss } from './battle/rules';
 import { abilityOf } from './pokemon/mon';
 import type { Mon } from './pokemon/mon';
 import { DoorGhosts } from './render/doorGhosts';
+import { updateFades } from './render/buildingFade';
 
 /** In compare mode both panes are GBA-shaped (3:2) and show the same 10 rows. */
 const GBA_ROWS = 10;
@@ -498,6 +499,8 @@ export class Game implements ScriptHost {
     this.trackCell();
     if (this.rig.orbit.enabled) this.rig.orbit.update();
     else this.rig.follow(this.views.position(player), this.comparing ? GBA_ROWS : undefined);
+    // A building between the camera and Red dithers away (not in the free orbit view).
+    updateFades(this.stage.buildings, this.rig.cam.position, this.views.position(player), dt, !this.rig.orbit.enabled);
     this.stage.render(this.rig.cam);
     if (this.comparing) this.gba.draw(world, player, this.areaActors(), this.home);
     this.emote.place(this.overHead);

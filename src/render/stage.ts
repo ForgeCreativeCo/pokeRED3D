@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { LoadedMap } from '../data/load';
 import type { World } from '../world/world';
 import { buildMapMeshes, type MapMeshes } from './mapMesh';
+import type { FadingBuilding } from './buildingFade';
 
 const SKY = '#9fd3e8';
 const INDOOR = '#000000';
@@ -26,7 +27,7 @@ export class Stage {
     for (const m of maps) {
       const mm = buildMapMeshes(m);
       this.meshes.set(m, mm);
-      this.scene.add(mm.opaque, mm.cutout);
+      this.scene.add(mm.opaque, mm.cutout, ...mm.buildings.flatMap((b) => b.meshes));
     }
   }
 
@@ -37,12 +38,23 @@ export class Stage {
   /** Lighting on (Lambert) or off (the flat GBA colours). */
   setLit(lit: boolean) {
     const key = lit ? 'lit' : 'flat';
-    for (const mm of this.meshes.values()) { mm.opaque.material = mm.materials[key][0]; mm.cutout.material = mm.materials[key][1]; }
+    for (const mm of this.meshes.values()) {
+      mm.opaque.material = mm.materials[key][0]; mm.cutout.material = mm.materials[key][1];
+      for (const b of mm.buildings) for (const mesh of b.meshes) mesh.material = mesh.userData[key];
+    }
   }
 
   showArea(world: World) {
-    for (const [m, mm] of this.meshes) mm.opaque.visible = mm.cutout.visible = world.inArea(m);
+    for (const [m, mm] of this.meshes) {
+      mm.opaque.visible = mm.cutout.visible = world.inArea(m);
+      for (const b of mm.buildings) for (const mesh of b.meshes) mesh.visible = world.inArea(m);
+    }
     (this.scene.background as THREE.Color).set(world.areaMaps().some((m) => m.data.indoor) ? INDOOR : SKY);
+  }
+
+  /** Every building in the loaded maps, for fading the ones that hide the player. */
+  get buildings(): FadingBuilding[] {
+    return [...this.meshes.values()].flatMap((mm) => mm.buildings);
   }
 
   render(cam: THREE.Camera) {
